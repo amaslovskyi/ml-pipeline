@@ -1,0 +1,418 @@
+# =============================================================================
+# Python Development
+# =============================================================================
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+cover/
+
+# Translations
+*.mo
+*.pot
+
+# Django stuff
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+
+# Flask stuff
+instance/
+.webassets-cache
+
+# Scrapy stuff
+.scrapy
+
+# Sphinx documentation
+docs/_build/
+
+# PyBuilder
+.pybuilder/
+target/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# IPython
+profile_default/
+ipython_config.py
+
+# pyenv
+.python-version
+
+# pipenv
+Pipfile.lock
+
+# poetry
+poetry.lock
+
+# pdm
+.pdm.toml
+__pypackages__/
+
+# Celery stuff
+celerybeat-schedule
+celerybeat.pid
+
+# SageMath parsed files
+*.sage.py
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Spyder project settings
+.spyderproject
+.spyproject
+
+# Rope project settings
+.ropeproject
+
+# mkdocs documentation
+/site
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre type checker
+.pyre/
+
+# pytype static type analyzer
+.pytype/
+
+# Cython debug symbols
+cython_debug/
+
+# =============================================================================
+# MLOps & Machine Learning
+# =============================================================================
+
+# MLflow
+mlruns/
+mlflow-data/
+.mlflow/
+
+# Model artifacts and checkpoints
+models/artifacts/
+models/checkpoints/
+models/saved_models/
+models/trained/
+models/deployed/
+*.pkl
+*.joblib
+*.h5
+*.pb
+*.onnx
+*.pt
+*.pth
+*.bin
+*.safetensors
+
+# Data files (keep structure, ignore content)
+data/raw/*
+!data/raw/.gitkeep
+data/processed/*
+!data/processed/.gitkeep
+data/external/*
+!data/external/.gitkeep
+data/interim/*
+!data/interim/.gitkeep
+
+# DVC
+.dvc/cache/
+.dvc/tmp/
+.dvc/config.local
+
+# Jupyter notebook outputs
+*.ipynb
+
+# Experiment tracking
+experiments/
+experiment-logs/
+wandb/
+runs/
+lightning_logs/
+
+# Model serving
+model-server/
+serving/
+seldon-deployments/
+
+# Feature store
+feature-store/
+feature-store-data/
+
+# Model registry
+model-registry/
+registry/
+
+# Pipeline artifacts
+pipeline-artifacts/
+workflow-artifacts/
+
+# Large datasets (use DVC or Git LFS)
+datasets/
+large-data/
+
+# Model versioning
+model-versions/
+versioned-models/
+
+# =============================================================================
+# Infrastructure as Code
+# =============================================================================
+
+# Terraform
+*.tfstate
+*.tfstate.*
+.terraform/
+.terraform.lock.hcl
+terraform.tfvars
+terraform.tfvars.json
+terraform-local/
+tf-local/
+
+# Kubernetes
+kubeconfig
+*.kubeconfig
+k8s-local/
+k8s-dev/
+
+# Docker
+.dockerignore
+docker-volumes/
+
+# Helm
+charts/*/charts/
+charts/*/requirements.lock
+
+# =============================================================================
+# Monitoring & Observability
+# =============================================================================
+
+# Monitoring data
+monitoring-data/
+monitoring-local/
+grafana-local/
+prometheus-local/
+
+# Logs
+logs/
+*.log
+*.out
+local-logs/
+app-logs/
+
+# Performance profiling
+*.prof
+
+# =============================================================================
+# Security & Credentials
+# =============================================================================
+
+# SSL certificates
+*.pem
+*.key
+*.crt
+certs/
+certificates/
+
+# Secrets and credentials
+secrets/
+.secrets
+credentials.json
+service-account.json
+api_keys.txt
+*.key
+*.token
+
+# Local environment files
+.env.development
+.env.test
+.env.production
+.env.local
+
+# =============================================================================
+# Development & Local Files
+# =============================================================================
+
+# Local development
+local-storage/
+dvc-storage/
+postgres-data/
+grafana-data/
+minio-data/
+prometheus-data/
+
+# Local configuration
+config/local/
+config/dev/
+config/test/
+config.local.yaml
+config.local.json
+
+# Temporary files
+*.tmp
+*.temp
+*~
+temp_models/
+tmp_models/
+
+# Backup files
+*.bak
+*.backup
+backups/
+recovery/
+
+# Local databases
+*.db
+*.sqlite
+*.sqlite3
+local-db/
+dev-db/
+
+# Cache directories
+.cache/
+cache/
+local-cache/
+dev-cache/
+
+# Development tools
+dev-tools/
+local-tools/
+
+# Local secrets
+local-secrets/
+dev-secrets/
+
+# Local storage
+storage-local/
+minio-local/
+
+# =============================================================================
+# IDE & Editor Files
+# =============================================================================
+
+# IDE specific
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# =============================================================================
+# OS Specific Files
+# =============================================================================
+
+# macOS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+*~
+
+# =============================================================================
+# Workflow & Pipeline Specific
+# =============================================================================
+
+# Argo Workflows
+argo-workflows/logs/
+argo-workflows/tmp/
+
+# Airflow
+airflow.cfg
+airflow.db
+airflow-webserver.pid
+standalone_admin_password.txt
+
+# Kubeflow
+kubeflow-manifests/
+kubeflow-config/
+
+# Hydra
+outputs/
+multirun/
+.hydra/
+
+# Compiled binaries
+*.exe
+*.dll
+
+# Archive files
+*.zip
+*.tar.gz
+*.rar
+
+# Large files (use Git LFS)
+*.bin
+*.safetensors
+*.h5
+*.pb
+*.onnx
+*.pt
+*.pth 

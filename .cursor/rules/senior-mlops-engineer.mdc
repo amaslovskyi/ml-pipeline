@@ -1,0 +1,286 @@
+---
+alwaysApply: true
+description: Senior MLOps Engineer guidelines for enterprise-grade machine learning operations
+---
+
+# Senior MLOps Engineer Guidelines
+
+## 🎯 Core Principles
+
+### **Production-First Mindset**
+
+- Every system must be designed for 99.99% uptime SLA
+- Implement zero-downtime deployments and rollback strategies
+- Design for failure - assume everything will break
+- Always consider disaster recovery and business continuity
+
+### **Security by Default**
+
+- Follow zero-trust principles for all infrastructure
+- Implement least privilege access for all components
+- Encrypt data at rest and in transit
+- Use secrets management (HashiCorp Vault, AWS Secrets Manager)
+- Never hardcode credentials or API keys
+
+### **Observability & Monitoring**
+
+- Implement comprehensive logging (structured JSON logs)
+- Set up monitoring with Prometheus/Grafana
+- Create meaningful alerts with proper thresholds
+- Use distributed tracing for microservices
+- Monitor model performance drift and data quality
+
+### **Cost Optimization**
+
+- Right-size infrastructure resources
+- Implement auto-scaling policies
+- Use spot instances where appropriate
+- Monitor and optimize cloud spend
+- Implement resource tagging for cost allocation
+
+## 🏗️ Infrastructure Design
+
+### **Kubernetes Best Practices**
+
+- Use namespaces for environment isolation
+- Implement resource limits and requests
+- Use HorizontalPodAutoscaler for auto-scaling
+- Implement pod disruption budgets
+- Use network policies for security
+
+### **CI/CD Pipeline Standards**
+
+- Implement GitOps workflows with ArgoCD
+- Use semantic versioning for all artifacts
+- Implement automated testing at every stage
+- Use infrastructure as code (Terraform/Pulumi)
+- Implement automated security scanning
+
+### **Data Pipeline Architecture**
+
+- Implement data versioning with DVC
+- Use feature stores for model features
+- Implement data quality monitoring
+- Design for data lineage and audit trails
+- Use streaming for real-time processing
+
+## 🤖 ML Model Management
+
+### **Model Lifecycle**
+
+- Implement model versioning and registry
+- Use MLflow for experiment tracking
+- Implement A/B testing frameworks
+- Monitor model drift and performance
+- Implement automated model retraining
+
+### **Model Serving**
+
+- Use Seldon Core or KServe for model serving
+- Implement canary deployments
+- Monitor model inference latency and throughput
+- Implement model explainability and interpretability
+- Use model compression for edge deployment
+
+### **Data Management**
+
+- Implement data catalog and governance
+- Use Delta Lake or Iceberg for data lakes
+- Implement data quality checks and validation
+- Design for data privacy and compliance (GDPR, CCPA)
+- Use data lineage tools for audit trails
+
+## 🔧 Development Standards
+
+### **Code Quality**
+
+- Write clean, modular, and testable code
+- Implement comprehensive unit and integration tests
+- Use type hints and documentation
+- Follow consistent naming conventions
+- Implement code review processes
+
+### **Configuration Management**
+
+- Use environment-specific configurations
+- Implement configuration validation
+- Use Helm charts for Kubernetes deployments
+- Implement configuration drift detection
+- Use feature flags for gradual rollouts
+
+### **Error Handling**
+
+- Implement proper error handling and retry logic
+- Use circuit breakers for external dependencies
+- Implement graceful degradation
+- Log errors with proper context
+- Implement automated error reporting
+
+## 📊 Monitoring & Alerting
+
+### **System Monitoring**
+
+- Monitor infrastructure metrics (CPU, memory, disk, network)
+- Set up application performance monitoring (APM)
+- Monitor database performance and connections
+- Implement synthetic monitoring for critical paths
+- Use distributed tracing for request flows
+
+### **ML-Specific Monitoring**
+
+- Monitor model prediction accuracy and drift
+- Track feature distribution changes
+- Monitor data pipeline health and latency
+- Implement model performance alerts
+- Monitor training job success rates and duration
+
+### **Alerting Strategy**
+
+- Set up actionable alerts with proper thresholds
+- Implement alert fatigue prevention
+- Use escalation policies for critical issues
+- Implement on-call rotation and incident response
+- Create runbooks for common issues
+
+## 🛡️ Security & Compliance
+
+### **Access Control**
+
+- Implement RBAC for all systems
+- Use service accounts with minimal privileges
+- Implement network policies and firewalls
+- Use VPN or private endpoints for sensitive data
+- Implement audit logging for all access
+
+### **Data Protection**
+
+- Encrypt sensitive data at rest and in transit
+- Implement data masking and anonymization
+- Use secure communication protocols (TLS 1.3)
+- Implement data retention and deletion policies
+- Follow SOC2 and PCI-DSS compliance requirements
+
+### **Vulnerability Management**
+
+- Implement automated security scanning
+- Keep dependencies updated and patched
+- Use container scanning for vulnerabilities
+- Implement secret rotation policies
+- Conduct regular security audits
+
+## 📈 Performance & Scalability
+
+### **Performance Optimization**
+
+- Implement caching strategies (Redis, Memcached)
+- Use CDN for static content delivery
+- Optimize database queries and indexing
+- Implement connection pooling
+- Use async processing for heavy workloads
+
+### **Scalability Patterns**
+
+- Design for horizontal scaling
+- Implement auto-scaling based on metrics
+- Use message queues for decoupling
+- Implement circuit breakers and bulkheads
+- Design for geographic distribution
+
+### **Resource Management**
+
+- Implement proper resource limits
+- Use resource quotas and limits
+- Monitor and optimize resource usage
+- Implement cost allocation and chargeback
+- Use spot instances for cost optimization
+
+## 🚀 Deployment & Release Management
+
+### **Deployment Strategies**
+
+- Implement blue-green deployments
+- Use canary deployments for risk mitigation
+- Implement automated rollback capabilities
+- Use feature flags for gradual rollouts
+- Implement deployment windows and maintenance periods
+
+### **Release Management**
+
+- Use semantic versioning for all artifacts
+- Implement release notes and changelogs
+- Use automated release pipelines
+- Implement post-deployment verification
+- Use staging environments for testing
+
+### **Disaster Recovery**
+
+- Implement automated backup strategies
+- Design for multi-region deployment
+- Implement automated failover procedures
+- Test disaster recovery procedures regularly
+- Maintain runbooks for incident response
+
+## 📋 Documentation & Knowledge Management
+
+### **Technical Documentation**
+
+- Maintain up-to-date architecture diagrams
+- Document API specifications and contracts
+- Create runbooks for common operations
+- Document troubleshooting procedures
+- Maintain knowledge base for team members
+
+### **Operational Procedures**
+
+- Document deployment procedures
+- Create incident response playbooks
+- Maintain configuration documentation
+- Document monitoring and alerting procedures
+- Create onboarding documentation for new team members
+
+## 🔄 Continuous Improvement
+
+### **Metrics & KPIs**
+
+- Track system availability and performance
+- Monitor deployment frequency and success rates
+- Measure mean time to recovery (MTTR)
+- Track change failure rates
+- Monitor team velocity and productivity
+
+### **Process Optimization**
+
+- Implement retrospectives and post-mortems
+- Use data-driven decision making
+- Continuously improve automation
+- Optimize development and deployment processes
+- Foster a culture of learning and experimentation
+
+## 🛠️ Tools & Technologies
+
+### **Essential Tools**
+
+- **Infrastructure**: Terraform, Kubernetes, Docker
+- **CI/CD**: GitLab CI, Jenkins, ArgoCD
+- **Monitoring**: Prometheus, Grafana, ELK Stack
+- **ML Platforms**: MLflow, Kubeflow, Seldon
+- **Data**: Apache Airflow, DVC, Delta Lake
+- **Security**: HashiCorp Vault, AWS Secrets Manager
+- **Observability**: Jaeger, Zipkin, OpenTelemetry
+
+### **Best Practices**
+
+- Use infrastructure as code for all environments
+- Implement automated testing and validation
+- Use configuration management tools
+- Implement proper logging and monitoring
+- Use version control for all artifacts
+- Implement automated security scanning
+- Use container orchestration for scalability
+- Implement proper backup and recovery procedures
+
+Remember: **Production is not a test environment**. Every decision should consider the impact on system reliability, security, and performance.
+description:
+globs:
+alwaysApply: false
+---
