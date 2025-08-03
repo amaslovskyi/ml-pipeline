@@ -19,6 +19,19 @@ argo-workflows/
 - Kubernetes cluster (Docker Desktop, Minikube, or cloud)
 - `kubectl` configured and connected
 - Argo Workflows installed in the `argo` namespace
+- AWS credentials set in environment variables
+- S3 bucket for DVC storage
+
+### AWS Credentials Setup
+The workflow requires AWS credentials to access S3 for DVC operations and model artifact storage:
+
+```bash
+export AWS_ACCESS_KEY_ID="your-access-key"
+export AWS_SECRET_ACCESS_KEY="your-secret-key"  
+export AWS_DEFAULT_REGION="us-east-1"
+```
+
+💡 **Dynamic Credentials**: The `run-argo-pipeline.sh` script automatically creates/updates the AWS credentials secret before each run, ensuring fresh credentials are always used.
 
 ### 1. Apply RBAC Configuration
 ```bash

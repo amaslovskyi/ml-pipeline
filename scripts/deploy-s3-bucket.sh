@@ -30,9 +30,11 @@ log_blue() {
 
 # Default values
 ENVIRONMENT=${1:-development}
-BUCKET_NAME=${2:-mlops-data-bucket}
+# Generate unique bucket name with timestamp to avoid conflicts
+TIMESTAMP=$(date +%s)
+BUCKET_NAME=${2:-mlops-data-bucket-${TIMESTAMP}}
 STACK_NAME="mlops-s3-bucket-${ENVIRONMENT}"
-TEMPLATE_FILE="cloudformation/s3-mlops-data-bucket.yaml"
+TEMPLATE_FILE="../cloudformation/s3-mlops-data-bucket.yaml"
 REGION="us-east-1"
 
 echo "🚀 MLOps S3 Bucket CloudFormation Deployment"

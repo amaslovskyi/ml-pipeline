@@ -38,7 +38,7 @@ if [ -z "$1" ]; then
 fi
 
 S3_BUCKET_NAME="$1"
-WORKFLOW_FILE="argo-workflows/ml-pipeline.yaml"
+WORKFLOW_FILE="../argo-workflows/ml-pipeline.yaml"
 
 # Check if workflow file exists
 if [ ! -f "$WORKFLOW_FILE" ]; then

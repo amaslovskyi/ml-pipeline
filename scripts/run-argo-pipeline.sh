@@ -30,6 +30,34 @@ print_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
+# Function to create/update AWS credentials secret
+update_aws_credentials() {
+    print_status "🔐 Updating AWS credentials for workflow..."
+    
+    # Check if AWS credentials are available
+    if [ -z "$AWS_ACCESS_KEY_ID" ] || [ -z "$AWS_SECRET_ACCESS_KEY" ]; then
+        print_error "AWS credentials not found in environment variables"
+        print_error "Please set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY"
+        exit 1
+    fi
+    
+    # Delete existing secret if it exists
+    kubectl delete secret aws-credentials -n argo --ignore-not-found=true
+    
+    # Create new secret with current AWS credentials
+    kubectl create secret generic aws-credentials -n argo \
+        --from-literal=AWS_ACCESS_KEY_ID="${AWS_ACCESS_KEY_ID}" \
+        --from-literal=AWS_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY}" \
+        --from-literal=AWS_DEFAULT_REGION="${AWS_DEFAULT_REGION:-us-east-1}"
+    
+    if [ $? -eq 0 ]; then
+        print_success "AWS credentials secret updated successfully"
+    else
+        print_error "Failed to update AWS credentials secret"
+        exit 1
+    fi
+}
+
 # Check if kubectl is available
 if ! command -v kubectl &> /dev/null; then
     print_error "kubectl is not installed. Please install kubectl first."
@@ -80,27 +108,22 @@ if ! command -v argo &> /dev/null; then
     print_success "Argo CLI installed!"
 fi
 
-# Check if Argo server is running
-if ! kubectl get pods -n argo -l app=argo-server --no-headers | grep -q Running; then
-    print_error "Argo server is not running. Please check the installation."
-    exit 1
-fi
+            # Check if Argo server is running
+            if ! kubectl get pods -n argo -l app=server --no-headers | grep -q Running; then
+                print_error "Argo server is not running. Please check the installation."
+                exit 1
+            fi
 
 print_status "Argo Workflows is ready!"
 
-# Start port forwarding for Argo UI
-print_status "Starting port forwarding for Argo UI..."
-kubectl port-forward -n argo svc/argo-server 2746:2746 &
-ARGO_PID=$!
+                        print_status "Argo Workflows is ready!"
 
-# Wait for port forwarding
-sleep 3
-
-print_success "Argo UI available at: https://localhost:2746"
-
-# Submit the simple ML pipeline
-print_status "Submitting ML pipeline workflow..."
-argo submit argo-workflows/simple-ml-pipeline.yaml -n argo
+            # Update AWS credentials before submitting
+            update_aws_credentials
+            
+            # Submit the ML pipeline
+            print_status "Submitting ML pipeline workflow..."
+            argo submit ../argo-workflows/ml-pipeline.yaml -n argo
 
 WORKFLOW_NAME=$(argo list -n argo --no-headers | head -1 | awk '{print $1}')
 
@@ -116,11 +139,8 @@ echo "  argo watch $WORKFLOW_NAME -n argo"
 print_status "To view workflow logs:"
 echo "  argo logs $WORKFLOW_NAME -n argo"
 
-print_status "To access Argo UI:"
-echo "  https://localhost:2746"
+            print_status "To access Argo UI:"
+            echo "  Use your web interface to access Argo UI"
 
-print_status "To stop port forwarding:"
-echo "  kill $ARGO_PID"
-
-print_success "🎉 ML Pipeline is running in Argo Workflows!"
-print_status "Check the Argo UI to see the workflow execution in real-time!" 
+            print_success "🎉 ML Pipeline is running in Argo Workflows!"
+            print_status "Check your web interface to monitor the workflow execution!" 
