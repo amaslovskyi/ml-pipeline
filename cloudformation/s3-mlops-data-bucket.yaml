@@ -162,12 +162,12 @@ Resources:
         - !Ref DVCAccessRole
 
   # IAM Instance Profile for EC2 instances
-  DVCInstanceProfile:
-    Type: AWS::IAM::InstanceProfile
-    Properties:
-      InstanceProfileName: !Sub "${BucketName}-dvc-instance-profile"
-      Roles:
-        - !Ref DVCAccessRole
+  # DVCInstanceProfile:
+  #   Type: AWS::IAM::InstanceProfile
+  #   Properties:
+  #     InstanceProfileName: !Sub "${BucketName}-dvc-instance-profile"
+  #     Roles:
+  #       - !Ref DVCAccessRole
 
   # IAM User for CI/CD Pipeline Access
   MLOpsCIUser:
