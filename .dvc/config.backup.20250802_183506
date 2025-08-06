@@ -1,5 +1,0 @@
-[core]
-    remote = s3
-['remote "s3"']
-    url = s3://mlops-data-bucket/dvc
-    region = us-east-1

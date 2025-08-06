@@ -1,5 +1,5 @@
 [core]
-    remote = s3
-['remote "s3"']
-    url = s3://mlops-data-bucket-1754148674-amaslovs/dvc
-    region = us-east-1
+    no_scm = True
+    remote = onedrive
+['remote "onedrive"']
+    url = "/Users/amaslovs/Library/CloudStorage/OneDrive-SoftServe,Inc/MLOps-DVC-Storage"

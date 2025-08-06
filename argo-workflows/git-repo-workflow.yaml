@@ -156,8 +156,7 @@ spec:
             pip install pandas numpy scikit-learn dvc boto3
 
             # Set up DVC with S3 remote using parameters
-            dvc remote add s3 s3://{{inputs.parameters.dvc-s3-bucket}}/dvc --force
-            dvc remote modify s3 region {{inputs.parameters.dvc-s3-region}}
+            dvc remote add -d onedrive /Users/amaslovs/Library/CloudStorage/OneDrive-SoftServe,Inc/MLOps-DVC-Storage
 
             # Create data directory structure
             mkdir -p data/raw data/processed data/interim
@@ -244,8 +243,7 @@ spec:
             pip install pandas numpy scikit-learn dvc boto3 joblib
 
             # Set up DVC with S3 remote using parameters
-            dvc remote add s3 s3://{{inputs.parameters.dvc-s3-bucket}}/dvc --force
-            dvc remote modify s3 region {{inputs.parameters.dvc-s3-region}}
+            dvc remote add -d onedrive /Users/amaslovs/Library/CloudStorage/OneDrive-SoftServe,Inc/MLOps-DVC-Storage
 
             # Pull latest data from DVC
             dvc pull data/raw/sample_data_v1.0.csv.dvc

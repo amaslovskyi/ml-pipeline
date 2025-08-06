@@ -1,0 +1,823 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  name: qwen-foundational-training-pipeline-locally
+  namespace: argo
+spec:
+  serviceAccountName: argo-workflow-sa
+  entrypoint: qwen-training-pipeline
+  arguments:
+    parameters:
+      - name: model-base
+        value: "Qwen/Qwen3-8B" # Base model for fine-tuning - Latest Qwen3
+      - name: dataset-name
+        value: "devops-sre-dataset"
+      - name: training-approach
+        value: "lora" # LoRA, QLoRA, or full fine-tuning
+      - name: max-seq-length
+        value: "2048"
+      - name: learning-rate
+        value: "2e-4"
+      - name: epochs
+        value: "3"
+      - name: batch-size
+        value: "4" # Adjusted for memory efficiency
+      - name: gradient-accumulation-steps
+        value: "8"
+      - name: dvc-s3-bucket
+        value: "mlops-data-bucket-1754159204"
+      - name: dvc-s3-region
+        value: "us-east-1"
+      - name: huggingface-token
+        value: "hf_token_placeholder"
+      - name: wandb-project
+        value: "qwen-devops-foundation"
+
+  templates:
+    - name: qwen-training-pipeline
+      dag:
+        tasks:
+          # Data preparation for DevOps/SRE domain
+          - name: prepare-devops-dataset
+            template: prepare-domain-data
+            arguments:
+              parameters:
+                - name: dataset-name
+                  value: "{{workflow.parameters.dataset-name}}"
+                - name: dvc-s3-bucket
+                  value: "{{workflow.parameters.dvc-s3-bucket}}"
+                - name: dvc-s3-region
+                  value: "{{workflow.parameters.dvc-s3-region}}"
+
+          # Environment setup for training
+          - name: setup-training-environment
+            template: setup-hf-environment
+            dependencies: [prepare-devops-dataset]
+            arguments:
+              parameters:
+                - name: model-base
+                  value: "{{workflow.parameters.model-base}}"
+                - name: huggingface-token
+                  value: "{{workflow.parameters.huggingface-token}}"
+
+          # Model fine-tuning with LoRA/QLoRA
+          - name: finetune-qwen-model
+            template: train-foundational-model
+            dependencies: [setup-training-environment]
+            arguments:
+              parameters:
+                - name: model-base
+                  value: "{{workflow.parameters.model-base}}"
+                - name: dataset-name
+                  value: "{{workflow.parameters.dataset-name}}"
+                - name: training-approach
+                  value: "{{workflow.parameters.training-approach}}"
+                - name: max-seq-length
+                  value: "{{workflow.parameters.max-seq-length}}"
+                - name: learning-rate
+                  value: "{{workflow.parameters.learning-rate}}"
+                - name: epochs
+                  value: "{{workflow.parameters.epochs}}"
+                - name: batch-size
+                  value: "{{workflow.parameters.batch-size}}"
+                - name: gradient-accumulation-steps
+                  value: "{{workflow.parameters.gradient-accumulation-steps}}"
+                - name: wandb-project
+                  value: "{{workflow.parameters.wandb-project}}"
+
+          # Model evaluation and benchmarking
+          - name: evaluate-foundational-model
+            template: evaluate-model-performance
+            dependencies: [finetune-qwen-model]
+            arguments:
+              parameters:
+                - name: model-base
+                  value: "{{workflow.parameters.model-base}}"
+                - name: dataset-name
+                  value: "{{workflow.parameters.dataset-name}}"
+
+          # Model registration and deployment preparation
+          - name: register-foundational-model
+            template: register-hf-model
+            dependencies: [evaluate-foundational-model]
+            arguments:
+              parameters:
+                - name: model-base
+                  value: "{{workflow.parameters.model-base}}"
+                - name: dvc-s3-bucket
+                  value: "{{workflow.parameters.dvc-s3-bucket}}"
+                - name: dvc-s3-region
+                  value: "{{workflow.parameters.dvc-s3-region}}"
+                - name: huggingface-token
+                  value: "{{workflow.parameters.huggingface-token}}"
+
+    # Template for preparing DevOps/SRE domain-specific datasets
+    - name: prepare-domain-data
+      inputs:
+        parameters:
+          - name: dataset-name
+          - name: dvc-s3-bucket
+          - name: dvc-s3-region
+      container:
+        image: python:3.11-slim
+        command: [bash]
+        env:
+          - name: AWS_ACCESS_KEY_ID
+            valueFrom:
+              secretKeyRef:
+                name: aws-credentials
+                key: AWS_ACCESS_KEY_ID
+          - name: AWS_SECRET_ACCESS_KEY
+            valueFrom:
+              secretKeyRef:
+                name: aws-credentials
+                key: AWS_SECRET_ACCESS_KEY
+          - name: AWS_DEFAULT_REGION
+            valueFrom:
+              secretKeyRef:
+                name: aws-credentials
+                key: AWS_DEFAULT_REGION
+        args:
+          - -c
+          - |
+            echo "Preparing DevOps/SRE domain dataset: {{inputs.parameters.dataset-name}}"
+
+            # Install required packages with 2025 versions
+            pip install --no-cache-dir pandas numpy datasets huggingface_hub
+            pip install --no-cache-dir dvc 's3fs>=2025.3.0' 'fsspec>=2025.7.0'
+
+            # Initialize DVC
+            dvc init --no-scm
+            dvc remote add -d onedrive /Users/amaslovs/Library/CloudStorage/OneDrive-SoftServe,Inc/MLOps-DVC-Storage
+
+            # Create dataset directories
+            mkdir -p data/raw data/processed
+
+            # Copy the enhanced dataset script to container
+            cp /workspace/scripts/prepare-enhanced-devops-dataset.py ./
+
+            # Generate comprehensive DevOps/SRE dataset using enhanced script
+            export HUGGINGFACE_HUB_TOKEN="${HUGGINGFACE_HUB_TOKEN}"
+            python prepare-enhanced-devops-dataset.py --output-dir data/enhanced_devops_dataset || echo "Using fallback dataset"
+
+            # Generate fallback DevOps/SRE dataset if enhanced script fails
+            python -c "
+            import pandas as pd
+            import json
+            import os
+            from datasets import Dataset
+
+            # DevOps/SRE domain-specific training examples
+            devops_data = [
+                {
+                    'instruction': 'How do you troubleshoot high CPU usage in a Kubernetes pod?',
+                    'input': '',
+                    'output': 'To troubleshoot high CPU usage in a Kubernetes pod: 1) Use kubectl top pod to identify the pod, 2) Check pod resource limits with kubectl describe pod, 3) Examine application logs with kubectl logs, 4) Use kubectl exec to access the pod and run top/htop, 5) Check for resource requests/limits configuration, 6) Consider horizontal pod autoscaling if needed.'
+                },
+                {
+                    'instruction': 'Explain how to set up monitoring for a production ML model',
+                    'input': '',
+                    'output': 'Production ML model monitoring setup: 1) Implement model performance metrics (accuracy, latency, throughput), 2) Set up data drift detection using statistical tests, 3) Monitor prediction distribution changes, 4) Configure alerts for model degradation, 5) Use tools like Prometheus + Grafana for metrics visualization, 6) Implement logging for prediction requests/responses, 7) Set up automated model retraining triggers.'
+                },
+                {
+                    'instruction': 'How do you implement blue-green deployment for a microservice?',
+                    'input': '',
+                    'output': 'Blue-green deployment implementation: 1) Maintain two identical production environments (blue and green), 2) Deploy new version to inactive environment, 3) Test thoroughly in the green environment, 4) Switch traffic from blue to green using load balancer, 5) Monitor for issues and rollback if needed, 6) Keep blue environment as backup, 7) Use automation tools like ArgoCD or Jenkins for orchestration.'
+                },
+                {
+                    'instruction': 'What are the key considerations for designing a fault-tolerant distributed system?',
+                    'input': '',
+                    'output': 'Key fault-tolerant distributed system considerations: 1) Implement circuit breakers for external dependencies, 2) Use redundancy across multiple availability zones, 3) Design for graceful degradation, 4) Implement proper retry logic with exponential backoff, 5) Use health checks and automatic failover, 6) Ensure data consistency with appropriate patterns (eventual consistency, ACID), 7) Monitor system health and performance metrics, 8) Plan for disaster recovery scenarios.'
+                },
+                {
+                    'instruction': 'How do you optimize Docker container security?',
+                    'input': '',
+                    'output': 'Docker container security optimization: 1) Use minimal base images (alpine, distroless), 2) Run containers as non-root user, 3) Implement multi-stage builds to reduce attack surface, 4) Scan images for vulnerabilities using tools like Trivy, 5) Use secrets management instead of environment variables, 6) Configure security contexts and pod security policies, 7) Enable runtime security monitoring, 8) Regularly update base images and dependencies.'
+                },
+                {
+                    'instruction': 'Explain the difference between horizontal and vertical scaling',
+                    'input': '',
+                    'output': 'Horizontal vs Vertical scaling: Horizontal scaling (scale out) adds more machines/instances to handle load, providing better fault tolerance and unlimited scaling potential but requires application to be stateless. Vertical scaling (scale up) increases resources (CPU, RAM) of existing machines, simpler to implement but has hardware limits and single point of failure. Choose horizontal for web applications, vertical for databases with strict consistency requirements.'
+                },
+                {
+                    'instruction': 'How do you implement proper logging in a microservices architecture?',
+                    'input': '',
+                    'output': 'Microservices logging implementation: 1) Use structured logging (JSON format), 2) Implement correlation IDs for request tracing, 3) Centralize logs using ELK stack or similar, 4) Include service name, version, and environment in all logs, 5) Log at appropriate levels (ERROR, WARN, INFO, DEBUG), 6) Avoid logging sensitive information, 7) Implement log aggregation and retention policies, 8) Use distributed tracing for cross-service requests.'
+                },
+                {
+                    'instruction': 'What is Infrastructure as Code and what are its benefits?',
+                    'input': '',
+                    'output': 'Infrastructure as Code (IaC) manages infrastructure through code rather than manual processes. Benefits include: 1) Version control for infrastructure changes, 2) Reproducible and consistent environments, 3) Faster provisioning and deployment, 4) Reduced human errors, 5) Better collaboration through code reviews, 6) Cost optimization through resource management, 7) Disaster recovery through code-based recreation. Tools include Terraform, CloudFormation, Pulumi.'
+                }
+            ]
+
+            # Add more domain-specific examples for comprehensive training
+            additional_data = [
+                {
+                    'instruction': 'How do you handle secrets management in Kubernetes?',
+                    'input': '',
+                    'output': 'Kubernetes secrets management: 1) Use Kubernetes Secrets for basic secret storage, 2) Implement external secret management (HashiCorp Vault, AWS Secrets Manager), 3) Enable encryption at rest, 4) Use RBAC to control secret access, 5) Rotate secrets regularly, 6) Avoid hardcoding secrets in container images, 7) Use service accounts with minimal permissions, 8) Consider sealed secrets or external secret operators for GitOps workflows.'
+                },
+                {
+                    'instruction': 'Explain how to implement automated testing in CI/CD pipelines',
+                    'input': '',
+                    'output': 'Automated testing in CI/CD: 1) Implement unit tests for individual components, 2) Add integration tests for service interactions, 3) Include security scanning (SAST/DAST), 4) Run performance and load tests, 5) Implement contract testing for APIs, 6) Use test pyramids (more unit tests, fewer E2E tests), 7) Parallel test execution for faster feedback, 8) Fail fast and provide clear feedback, 9) Include smoke tests in production deployments.'
+                }
+            ]
+
+            devops_data.extend(additional_data)
+
+            # Convert to HuggingFace dataset format
+            df = pd.DataFrame(devops_data)
+            print(f'Created dataset with {len(df)} DevOps/SRE examples')
+
+            # Save raw data
+            df.to_json('data/raw/devops_sre_dataset.jsonl', orient='records', lines=True)
+
+            # Create processed instruction-following format
+            processed_data = []
+            for item in devops_data:
+                # Format for instruction-following training
+                if item['input']:
+                    text = f\"### Instruction:\n{item['instruction']}\n\n### Input:\n{item['input']}\n\n### Response:\n{item['output']}\"
+                else:
+                    text = f\"### Instruction:\n{item['instruction']}\n\n### Response:\n{item['output']}\"
+                processed_data.append({'text': text})
+
+            processed_df = pd.DataFrame(processed_data)
+            processed_df.to_json('data/processed/devops_sre_formatted.jsonl', orient='records', lines=True)
+
+            print(f'Dataset preparation completed: {len(processed_data)} training examples')
+            print('Saved files:')
+            print('- data/raw/devops_sre_dataset.jsonl')
+            print('- data/processed/devops_sre_formatted.jsonl')
+            "
+
+            # Add to DVC for version control
+            dvc add data/raw/devops_sre_dataset.jsonl
+            dvc add data/processed/devops_sre_formatted.jsonl
+            dvc push
+
+            echo "DevOps/SRE dataset prepared and versioned successfully"
+        resources:
+          requests:
+            memory: "2Gi"
+            cpu: "1"
+          limits:
+            memory: "4Gi"
+            cpu: "2"
+
+    # Template for setting up HuggingFace training environment
+    - name: setup-hf-environment
+      inputs:
+        parameters:
+          - name: model-base
+          - name: huggingface-token
+      container:
+        image: huggingface/transformers-pytorch-gpu:4.35.0 # Use official HF image with GPU support
+        command: [bash]
+        env:
+          - name: HUGGINGFACE_HUB_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: huggingface-credentials
+                key: HF_TOKEN
+          - name: WANDB_API_KEY
+            valueFrom:
+              secretKeyRef:
+                name: wandb-credentials
+                key: WANDB_API_KEY
+        args:
+          - -c
+          - |
+            echo "Setting up HuggingFace training environment for {{inputs.parameters.model-base}}"
+
+            # Install additional required packages
+            pip install --no-cache-dir peft accelerate bitsandbytes wandb
+            pip install --no-cache-dir datasets trl evaluate
+
+            # Login to HuggingFace Hub
+            huggingface-cli login --token $HUGGINGFACE_HUB_TOKEN
+
+            # Test model access
+            python -c "
+            from transformers import AutoTokenizer, AutoModelForCausalLM
+            import torch
+
+            model_name = '{{inputs.parameters.model-base}}'
+            print(f'Testing access to model: {model_name}')
+
+            try:
+                tokenizer = AutoTokenizer.from_pretrained(model_name)
+                print(f'✓ Tokenizer loaded successfully')
+                print(f'  Vocab size: {tokenizer.vocab_size}')
+                print(f'  Model max length: {tokenizer.model_max_length}')
+                
+                # Check GPU availability
+                if torch.cuda.is_available():
+                    print(f'✓ CUDA available: {torch.cuda.get_device_name(0)}')
+                    print(f'  GPU memory: {torch.cuda.get_device_properties(0).total_memory / 1024**3:.1f} GB')
+                else:
+                    print('⚠ No GPU available, will use CPU (slower training)')
+                    
+            except Exception as e:
+                print(f'✗ Error accessing model: {e}')
+                raise e
+            "
+
+            echo "HuggingFace environment setup completed successfully"
+        resources:
+          requests:
+            memory: "4Gi"
+            cpu: "2"
+            nvidia.com/gpu: 1 # Request GPU for training
+          limits:
+            memory: "8Gi"
+            cpu: "4"
+            nvidia.com/gpu: 1
+
+    # Template for training the foundational model
+    - name: train-foundational-model
+      inputs:
+        parameters:
+          - name: model-base
+          - name: dataset-name
+          - name: training-approach
+          - name: max-seq-length
+          - name: learning-rate
+          - name: epochs
+          - name: batch-size
+          - name: gradient-accumulation-steps
+          - name: wandb-project
+      container:
+        image: huggingface/transformers-pytorch-gpu:4.35.0
+        command: [bash]
+        env:
+          - name: HUGGINGFACE_HUB_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: huggingface-credentials
+                key: HF_TOKEN
+          - name: WANDB_API_KEY
+            valueFrom:
+              secretKeyRef:
+                name: wandb-credentials
+                key: WANDB_API_KEY
+          - name: AWS_ACCESS_KEY_ID
+            valueFrom:
+              secretKeyRef:
+                name: aws-credentials
+                key: AWS_ACCESS_KEY_ID
+          - name: AWS_SECRET_ACCESS_KEY
+            valueFrom:
+              secretKeyRef:
+                name: aws-credentials
+                key: AWS_SECRET_ACCESS_KEY
+        args:
+          - -c
+          - |
+            echo "Starting foundational model training"
+            echo "Model: {{inputs.parameters.model-base}}"
+            echo "Training approach: {{inputs.parameters.training-approach}}"
+            echo "Learning rate: {{inputs.parameters.learning-rate}}"
+            echo "Epochs: {{inputs.parameters.epochs}}"
+
+            # Install required packages if not already available
+            pip install --no-cache-dir peft accelerate bitsandbytes wandb trl evaluate
+            pip install --no-cache-dir dvc 's3fs>=2025.3.0' 'fsspec>=2025.7.0'
+
+            # Initialize DVC and pull dataset
+            dvc init --no-scm
+            dvc remote add -d onedrive /Users/amaslovs/Library/CloudStorage/OneDrive-SoftServe,Inc/MLOps-DVC-Storage
+            dvc pull || echo "No DVC files to pull"
+
+            # Login to services
+            huggingface-cli login --token $HUGGINGFACE_HUB_TOKEN
+            wandb login --relogin $WANDB_API_KEY
+
+            # Create training script
+            cat > train_qwen_foundation.py << 'EOF'
+            import os
+            import torch
+            import wandb
+            from datasets import load_dataset
+            from transformers import (
+                AutoTokenizer, 
+                AutoModelForCausalLM,
+                TrainingArguments,
+                Trainer,
+                DataCollatorForLanguageModeling
+            )
+            from peft import LoraConfig, get_peft_model, TaskType
+            import json
+
+            # Configuration
+            MODEL_NAME = "{{inputs.parameters.model-base}}"
+            DATASET_PATH = "data/processed/devops_sre_formatted.jsonl"
+            OUTPUT_DIR = "./qwen-devops-foundation"
+            MAX_LENGTH = int("{{inputs.parameters.max-seq-length}}")
+            LEARNING_RATE = float("{{inputs.parameters.learning-rate}}")
+            EPOCHS = int("{{inputs.parameters.epochs}}")
+            BATCH_SIZE = int("{{inputs.parameters.batch-size}}")
+            GRAD_ACCUM_STEPS = int("{{inputs.parameters.gradient-accumulation-steps}}")
+            TRAINING_APPROACH = "{{inputs.parameters.training-approach}}"
+
+            # Initialize wandb
+            wandb.init(
+                project="{{inputs.parameters.wandb-project}}", 
+                name=f"qwen-devops-{TRAINING_APPROACH}-training",
+                config={
+                    "model": MODEL_NAME,
+                    "max_length": MAX_LENGTH,
+                    "learning_rate": LEARNING_RATE,
+                    "epochs": EPOCHS,
+                    "batch_size": BATCH_SIZE,
+                    "gradient_accumulation_steps": GRAD_ACCUM_STEPS,
+                    "training_approach": TRAINING_APPROACH
+                }
+            )
+
+            print(f"Loading model and tokenizer: {MODEL_NAME}")
+
+            # Load tokenizer
+            tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
+            if tokenizer.pad_token is None:
+                tokenizer.pad_token = tokenizer.eos_token
+
+            # Load model with appropriate configuration
+            if TRAINING_APPROACH.lower() in ["qlora", "lora"]:
+                # Use 4-bit quantization for QLoRA
+                from transformers import BitsAndBytesConfig
+                
+                bnb_config = BitsAndBytesConfig(
+                    load_in_4bit=True,
+                    bnb_4bit_quant_type="nf4",
+                    bnb_4bit_compute_dtype=torch.float16,
+                    bnb_4bit_use_double_quant=True,
+                )
+                
+                model = AutoModelForCausalLM.from_pretrained(
+                    MODEL_NAME,
+                    quantization_config=bnb_config if TRAINING_APPROACH.lower() == "qlora" else None,
+                    torch_dtype=torch.float16,
+                    device_map="auto"
+                )
+                
+                # Configure LoRA
+                lora_config = LoraConfig(
+                    task_type=TaskType.CAUSAL_LM,
+                    inference_mode=False,
+                    r=16,  # Rank
+                    lora_alpha=32,
+                    lora_dropout=0.1,
+                    target_modules=["q_proj", "v_proj", "k_proj", "o_proj"]
+                )
+                
+                model = get_peft_model(model, lora_config)
+                model.print_trainable_parameters()
+                
+            else:
+                # Full fine-tuning
+                model = AutoModelForCausalLM.from_pretrained(
+                    MODEL_NAME,
+                    torch_dtype=torch.float16,
+                    device_map="auto"
+                )
+
+            print(f"Model loaded successfully")
+
+            # Load and prepare dataset
+            def load_jsonl(file_path):
+                data = []
+                with open(file_path, 'r') as f:
+                    for line in f:
+                        data.append(json.loads(line))
+                return data
+
+            print(f"Loading dataset from {DATASET_PATH}")
+            raw_data = load_jsonl(DATASET_PATH)
+            print(f"Loaded {len(raw_data)} training examples")
+
+            # Tokenize function
+            def tokenize_function(examples):
+                # Tokenize the text
+                tokens = tokenizer(
+                    examples["text"],
+                    truncation=True,
+                    padding=False,
+                    max_length=MAX_LENGTH,
+                    return_overflowing_tokens=False,
+                )
+                
+                # For causal LM, labels are the same as input_ids
+                tokens["labels"] = tokens["input_ids"].copy()
+                return tokens
+
+            # Convert to HuggingFace dataset and tokenize
+            from datasets import Dataset
+            dataset = Dataset.from_list(raw_data)
+            tokenized_dataset = dataset.map(
+                tokenize_function,
+                batched=True,
+                remove_columns=dataset.column_names,
+                desc="Tokenizing dataset"
+            )
+
+            print(f"Tokenized dataset size: {len(tokenized_dataset)}")
+
+            # Split dataset (90% train, 10% eval)
+            split_dataset = tokenized_dataset.train_test_split(test_size=0.1, seed=42)
+            train_dataset = split_dataset["train"]
+            eval_dataset = split_dataset["test"]
+
+            print(f"Train dataset size: {len(train_dataset)}")
+            print(f"Eval dataset size: {len(eval_dataset)}")
+
+            # Data collator
+            data_collator = DataCollatorForLanguageModeling(
+                tokenizer=tokenizer,
+                mlm=False,  # Not using masked language modeling
+            )
+
+            # Training arguments
+            training_args = TrainingArguments(
+                output_dir=OUTPUT_DIR,
+                num_train_epochs=EPOCHS,
+                per_device_train_batch_size=BATCH_SIZE,
+                per_device_eval_batch_size=BATCH_SIZE,
+                gradient_accumulation_steps=GRAD_ACCUM_STEPS,
+                learning_rate=LEARNING_RATE,
+                weight_decay=0.01,
+                logging_steps=10,
+                eval_steps=100,
+                save_steps=500,
+                evaluation_strategy="steps",
+                save_strategy="steps",
+                load_best_model_at_end=True,
+                metric_for_best_model="eval_loss",
+                greater_is_better=False,
+                warmup_steps=100,
+                lr_scheduler_type="cosine",
+                fp16=True,  # Use mixed precision
+                dataloader_pin_memory=True,
+                remove_unused_columns=False,
+                report_to="wandb",
+                run_name=f"qwen-devops-{TRAINING_APPROACH}",
+            )
+
+            # Initialize trainer
+            trainer = Trainer(
+                model=model,
+                args=training_args,
+                train_dataset=train_dataset,
+                eval_dataset=eval_dataset,
+                data_collator=data_collator,
+                tokenizer=tokenizer,
+            )
+
+            print("Starting training...")
+
+            # Train the model
+            trainer.train()
+
+            print("Training completed. Saving model...")
+
+            # Save the final model
+            trainer.save_model(OUTPUT_DIR)
+            tokenizer.save_pretrained(OUTPUT_DIR)
+
+            # Save training metrics
+            metrics = trainer.state.log_history
+            with open(f"{OUTPUT_DIR}/training_metrics.json", "w") as f:
+                json.dump(metrics, f, indent=2)
+
+            print(f"Model saved to {OUTPUT_DIR}")
+
+            # Log final metrics to wandb
+            final_metrics = trainer.evaluate()
+            wandb.log(final_metrics)
+
+            print("Training pipeline completed successfully!")
+            wandb.finish()
+            EOF
+
+            # Run the training
+            python train_qwen_foundation.py
+
+            # Create model card and documentation
+            cat > qwen-devops-foundation/README.md << 'EOF'
+            # Qwen DevOps Foundation Model
+
+            This model is a fine-tuned version of {{inputs.parameters.model-base}} specialized for DevOps and SRE tasks.
+
+            ## Training Details
+            - Base Model: {{inputs.parameters.model-base}}
+            - Training Approach: {{inputs.parameters.training-approach}}
+            - Learning Rate: {{inputs.parameters.learning-rate}}
+            - Epochs: {{inputs.parameters.epochs}}
+            - Max Sequence Length: {{inputs.parameters.max-seq-length}}
+
+            ## Use Cases
+            - DevOps troubleshooting assistance
+            - Infrastructure as Code guidance
+            - Monitoring and alerting configuration
+            - Deployment strategy recommendations
+            - Security best practices
+
+            ## Usage
+            ```python
+            from transformers import AutoTokenizer, AutoModelForCausalLM
+
+            tokenizer = AutoTokenizer.from_pretrained("./qwen-devops-foundation")
+            model = AutoModelForCausalLM.from_pretrained("./qwen-devops-foundation")
+
+            # Example usage
+            prompt = "### Instruction:\nHow do you troubleshoot high memory usage in a Kubernetes pod?\n\n### Response:\n"
+            inputs = tokenizer(prompt, return_tensors="pt")
+            outputs = model.generate(**inputs, max_new_tokens=200, temperature=0.7)
+            response = tokenizer.decode(outputs[0], skip_special_tokens=True)
+            print(response)
+            ```
+            EOF
+
+            echo "Foundational model training completed successfully"
+        resources:
+          requests:
+            memory: "16Gi"
+            cpu: "4"
+            nvidia.com/gpu: 1
+          limits:
+            memory: "32Gi"
+            cpu: "8"
+            nvidia.com/gpu: 1
+
+    # Template for evaluating model performance
+    - name: evaluate-model-performance
+      inputs:
+        parameters:
+          - name: model-base
+          - name: dataset-name
+      container:
+        image: huggingface/transformers-pytorch-gpu:4.35.0
+        command: [bash]
+        env:
+          - name: HUGGINGFACE_HUB_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: huggingface-credentials
+                key: HF_TOKEN
+        args:
+          - -c
+          - |
+            echo "Evaluating foundational model performance"
+
+            pip install --no-cache-dir evaluate rouge-score bleu nltk
+
+            # Model evaluation script
+            cat > evaluate_model.py << 'EOF'
+            import torch
+            from transformers import AutoTokenizer, AutoModelForCausalLM
+            import json
+            from evaluate import load
+            import re
+
+            MODEL_PATH = "./qwen-devops-foundation"
+            TEST_PROMPTS = [
+                "How do you troubleshoot a failed Kubernetes deployment?",
+                "Explain the benefits of Infrastructure as Code",
+                "What is the difference between monitoring and observability?",
+                "How do you implement blue-green deployment?"
+            ]
+
+            print(f"Loading model from {MODEL_PATH}")
+            tokenizer = AutoTokenizer.from_pretrained(MODEL_PATH)
+            model = AutoModelForCausalLM.from_pretrained(MODEL_PATH, torch_dtype=torch.float16, device_map="auto")
+
+            results = []
+
+            for prompt in TEST_PROMPTS:
+                input_text = f"### Instruction:\n{prompt}\n\n### Response:\n"
+                inputs = tokenizer(input_text, return_tensors="pt").to(model.device)
+                
+                with torch.no_grad():
+                    outputs = model.generate(
+                        **inputs,
+                        max_new_tokens=200,
+                        temperature=0.7,
+                        do_sample=True,
+                        pad_token_id=tokenizer.eos_token_id
+                    )
+                
+                response = tokenizer.decode(outputs[0], skip_special_tokens=True)
+                
+                # Extract just the response part
+                response_part = response.split("### Response:\n")[-1]
+                
+                results.append({
+                    "prompt": prompt,
+                    "response": response_part,
+                    "full_output": response
+                })
+                
+                print(f"\nPrompt: {prompt}")
+                print(f"Response: {response_part[:200]}...")
+
+            # Save evaluation results
+            with open("evaluation_results.json", "w") as f:
+                json.dump(results, f, indent=2)
+
+            print("\nModel evaluation completed successfully!")
+            EOF
+
+            python evaluate_model.py
+
+            echo "Model evaluation completed"
+        resources:
+          requests:
+            memory: "8Gi"
+            cpu: "2"
+            nvidia.com/gpu: 1
+          limits:
+            memory: "16Gi"
+            cpu: "4"
+            nvidia.com/gpu: 1
+
+    # Template for registering the trained model
+    - name: register-hf-model
+      inputs:
+        parameters:
+          - name: model-base
+          - name: dvc-s3-bucket
+          - name: dvc-s3-region
+          - name: huggingface-token
+      container:
+        image: huggingface/transformers-pytorch-gpu:4.35.0
+        command: [bash]
+        env:
+          - name: HUGGINGFACE_HUB_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: huggingface-credentials
+                key: HF_TOKEN
+          - name: AWS_ACCESS_KEY_ID
+            valueFrom:
+              secretKeyRef:
+                name: aws-credentials
+                key: AWS_ACCESS_KEY_ID
+          - name: AWS_SECRET_ACCESS_KEY
+            valueFrom:
+              secretKeyRef:
+                name: aws-credentials
+                key: AWS_SECRET_ACCESS_KEY
+        args:
+          - -c
+          - |
+            echo "Registering foundational model"
+
+            pip install --no-cache-dir huggingface_hub
+            pip install --no-cache-dir dvc 's3fs>=2025.3.0' 'fsspec>=2025.7.0'
+
+            # Login to HuggingFace
+            huggingface-cli login --token $HUGGINGFACE_HUB_TOKEN
+
+            # Initialize DVC
+            dvc init --no-scm
+            dvc remote add -d onedrive /Users/amaslovs/Library/CloudStorage/OneDrive-SoftServe,Inc/MLOps-DVC-Storage
+
+            # Archive and version the model
+            MODEL_DIR="./qwen-devops-foundation"
+
+            if [ -d "$MODEL_DIR" ]; then
+                echo "Model directory found, proceeding with registration"
+                
+                # Create model archive for S3 storage
+                tar -czf qwen-devops-foundation-model.tar.gz -C . qwen-devops-foundation/
+                
+                # Add to DVC for versioning
+                dvc add qwen-devops-foundation-model.tar.gz
+                dvc push
+                
+                # Upload evaluation results
+                if [ -f "evaluation_results.json" ]; then
+                    dvc add evaluation_results.json
+                    dvc push
+                fi
+                
+                echo "Model successfully versioned and stored in S3"
+                
+                # Optional: Push to HuggingFace Hub (uncomment if you want to publish)
+                # huggingface-cli upload your-username/qwen-devops-foundation ./qwen-devops-foundation
+                
+            else
+                echo "Model directory not found, skipping registration"
+                exit 1
+            fi
+
+            echo "Model registration completed successfully"
+        resources:
+          requests:
+            memory: "4Gi"
+            cpu: "1"
+          limits:
+            memory: "8Gi"
+            cpu: "2"

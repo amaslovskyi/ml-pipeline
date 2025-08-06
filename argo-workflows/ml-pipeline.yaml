@@ -123,9 +123,7 @@ spec:
 
             # Initialize DVC repository and set up S3 remote
             dvc init --no-scm
-            dvc remote add s3 s3://{{inputs.parameters.dvc-s3-bucket}}/dvc --force
-            dvc remote modify s3 region {{inputs.parameters.dvc-s3-region}}
-            dvc remote default s3
+            dvc remote add -d onedrive /Users/amaslovs/Library/CloudStorage/OneDrive-SoftServe,Inc/MLOps-DVC-Storage
 
             # Ensure DVC can create S3 folders by testing connection
             echo "Testing DVC S3 connection..."
@@ -243,9 +241,7 @@ spec:
 
             # Initialize DVC repository and set up S3 remote
             dvc init --no-scm
-            dvc remote add s3 s3://{{inputs.parameters.dvc-s3-bucket}}/dvc --force
-            dvc remote modify s3 region {{inputs.parameters.dvc-s3-region}}
-            dvc remote default s3
+            dvc remote add -d onedrive /Users/amaslovs/Library/CloudStorage/OneDrive-SoftServe,Inc/MLOps-DVC-Storage
 
             # Ensure DVC can create S3 folders by testing connection
             echo "Testing DVC S3 connection..."
@@ -367,9 +363,7 @@ spec:
 
             # Initialize DVC repository and set up S3 remote
             dvc init --no-scm
-            dvc remote add s3 s3://{{inputs.parameters.dvc-s3-bucket}}/dvc --force
-            dvc remote modify s3 region {{inputs.parameters.dvc-s3-region}}
-            dvc remote default s3
+            dvc remote add -d onedrive /Users/amaslovs/Library/CloudStorage/OneDrive-SoftServe,Inc/MLOps-DVC-Storage
 
             # Ensure DVC can create S3 folders by testing connection
             echo "Testing DVC S3 connection..."
@@ -599,9 +593,7 @@ spec:
 
             # Initialize DVC repository and set up S3 remote
             dvc init --no-scm
-            dvc remote add s3 s3://{{inputs.parameters.dvc-s3-bucket}}/dvc --force
-            dvc remote modify s3 region {{inputs.parameters.dvc-s3-region}}
-            dvc remote default s3
+            dvc remote add -d onedrive /Users/amaslovs/Library/CloudStorage/OneDrive-SoftServe,Inc/MLOps-DVC-Storage
 
             # Ensure DVC can create S3 folders by testing connection
             echo "Testing DVC S3 connection..."
