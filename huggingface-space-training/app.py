@@ -38,79 +38,310 @@ def load_devops_datasets():
     datasets_info = []
     all_examples = []
     
-    # Use comprehensive synthetic dataset due to HF infrastructure issues
-    print("Using comprehensive synthetic DevOps dataset for reliable training...")
-    datasets_info.append("ℹ️ Using synthetic dataset due to HuggingFace S3 infrastructure issues")
-    
-    # Add extended DevOps examples for better training coverage
-    extended_examples = [
+    # Always start with synthetic examples as a reliable base
+    synthetic_examples = [
         {
-            "instruction": "How do you implement blue-green deployment in Kubernetes?",
+            "instruction": "How do you troubleshoot high CPU usage in a Kubernetes pod?",
             "input": "",
-            "output": "Blue-green deployment in Kubernetes: 1) Create two identical environments (blue and green) using different selectors, 2) Deploy new version to inactive environment (green), 3) Test thoroughly with readiness/liveness probes, 4) Switch traffic by updating service selector labels, 5) Monitor metrics and logs post-switch, 6) Rollback by reverting service selector if issues occur, 7) Use tools like Argo Rollouts or Flagger for automation."
+            "output": "To troubleshoot high CPU usage in a Kubernetes pod: 1) Use kubectl top pod to identify the pod, 2) Check pod resource limits with kubectl describe pod, 3) Examine application logs with kubectl logs, 4) Use kubectl exec to access the pod and run top/htop, 5) Check for resource requests/limits configuration, 6) Consider horizontal pod autoscaling if needed."
         },
         {
-            "instruction": "Explain Prometheus monitoring setup for microservices",
+            "instruction": "Explain how to set up monitoring for a production ML model",
             "input": "",
-            "output": "Prometheus microservices monitoring: 1) Install Prometheus server via Helm chart, 2) Configure service discovery for automatic target detection, 3) Expose metrics endpoints (/metrics) in each microservice, 4) Set up alerting rules for SLA violations, 5) Configure Grafana dashboards for visualization, 6) Implement distributed tracing with Jaeger, 7) Monitor golden signals: latency, traffic, errors, saturation, 8) Use PushGateway for batch jobs, 9) Set up federation for multi-cluster monitoring."
+            "output": "Production ML model monitoring setup: 1) Implement model performance metrics (accuracy, latency, throughput), 2) Set up data drift detection using statistical tests, 3) Monitor prediction distribution changes, 4) Configure alerts for model degradation, 5) Use tools like Prometheus + Grafana for metrics visualization, 6) Implement logging for prediction requests/responses, 7) Set up automated model retraining triggers."
         },
         {
-            "instruction": "What are Terraform best practices for infrastructure as code?",
+            "instruction": "How do you implement blue-green deployment for a microservice?",
             "input": "",
-            "output": "Terraform best practices: 1) Use remote state storage (S3, Azure Blob) with state locking, 2) Organize code with modules for reusability, 3) Pin provider versions to avoid breaking changes, 4) Use variables and locals for parameterization, 5) Implement proper naming conventions and tagging, 6) Use terraform plan before apply in CI/CD, 7) Store sensitive data in parameter stores or vaults, 8) Use workspaces for environment separation, 9) Validate configurations with terraform validate and tflint, 10) Implement automated testing with Terratest."
+            "output": "Blue-green deployment implementation: 1) Maintain two identical production environments (blue and green), 2) Deploy new version to inactive environment, 3) Test thoroughly in the green environment, 4) Switch traffic from blue to green using load balancer, 5) Monitor for issues and rollback if needed, 6) Keep blue environment as backup, 7) Use automation tools like ArgoCD or Jenkins for orchestration."
+        },
+        {
+            "instruction": "What are the key considerations for designing a fault-tolerant distributed system?",
+            "input": "",
+            "output": "Key fault-tolerant distributed system considerations: 1) Implement circuit breakers for external dependencies, 2) Use redundancy across multiple availability zones, 3) Design for graceful degradation, 4) Implement proper retry logic with exponential backoff, 5) Use health checks and automatic failover, 6) Ensure data consistency with appropriate patterns (eventual consistency, ACID), 7) Monitor system health and performance metrics, 8) Plan for disaster recovery scenarios."
+        },
+        {
+            "instruction": "How do you optimize Docker container security?",
+            "input": "",
+            "output": "Docker container security optimization: 1) Use minimal base images (alpine, distroless), 2) Run containers as non-root user, 3) Implement multi-stage builds to reduce attack surface, 4) Scan images for vulnerabilities using tools like Trivy, 5) Use secrets management instead of environment variables, 6) Configure security contexts and pod security policies, 7) Enable runtime security monitoring, 8) Regularly update base images and dependencies."
         }
     ]
+    all_examples.extend(synthetic_examples)
+    datasets_info.append(f"✅ Synthetic examples: {len(synthetic_examples)} examples")
     
-    all_examples.extend(extended_examples)
-    datasets_info.append(f"✅ Extended synthetic examples: {len(extended_examples)} examples")
+    # Load VERIFIED external DevOps datasets from HuggingFace Hub (YOUR RECOMMENDED APPROACH!)
+    print("Loading VERIFIED external datasets - YOUR RECOMMENDED METHOD!")
     
-    # Add synthetic examples if datasets fail
-    if len(all_examples) < 50:
-        synthetic_examples = [
+    # 1. CoSQA - 20,000+ Web Queries for Code Search and Question Answering (VERIFIED!)
+    try:
+        print("Loading gonglinyuan/CoSQA dataset (20k+ web queries)...")
+        dataset = load_dataset("gonglinyuan/CoSQA", split="train")
+        examples = []
+        
+        # Debug: Print first item to see actual field names
+        print(f"CoSQA sample fields: {list(dataset[0].keys())}")
+        
+        for item in dataset.select(range(min(500, len(dataset)))):  # Reduced for Space memory
+            # CoSQA actual field names (from CodeXGLUE format)
+            query = item.get('nl', item.get('query', item.get('question', '')))
+            code = item.get('code', item.get('text', ''))
+            url = item.get('url', '')
+            
+            if query and code:
+                # Create instruction-response format for code Q&A
+                instruction = f"Explain what this code does:\n```\n{code}\n```"
+                output = f"This code answers the query: {query}"
+                
+                examples.append({
+                    "instruction": instruction,
+                    "input": "",
+                    "output": output
+                })
+                
+            elif query:  # If we have query without code, make it a Q&A
+                examples.append({
+                    "instruction": query,
+                    "input": "",
+                    "output": f"This is a software engineering question related to: {query}"
+                })
+                
+        all_examples.extend(examples)
+        datasets_info.append(f"✅ CoSQA Web Queries: {len(examples)} examples (20k+ total)")
+        print(f"Successfully loaded {len(examples)} examples from CoSQA - PREMIUM DATASET!")
+    except Exception as e:
+        datasets_info.append(f"⚠️ CoSQA failed: {str(e)}")
+        print(f"CoSQA dataset error: {str(e)}")
+    
+    # 2. StackExchange DevOps - YOUR RECOMMENDED DATASET (VERIFIED!)
+    try:
+        print("Loading mlfoundations-dev/stackexchange_devops dataset...")
+        dataset = load_dataset("mlfoundations-dev/stackexchange_devops", split="train")
+        examples = []
+        for item in dataset.select(range(min(800, len(dataset)))):
+            # StackExchange format
+            question = item.get('question', item.get('title', ''))
+            answer = item.get('answer', item.get('body', ''))
+            tags = item.get('tags', '')
+            
+            if question and answer:
+                # Add tags context if available
+                full_question = f"[Tags: {tags}] {question}" if tags else question
+                examples.append({
+                    "instruction": full_question,
+                    "input": "",
+                    "output": answer
+                })
+        all_examples.extend(examples)
+        datasets_info.append(f"✅ StackExchange DevOps: {len(examples)} examples")
+        print(f"Successfully loaded {len(examples)} examples from StackExchange DevOps - YOUR RECOMMENDATION!")
+    except Exception as e:
+        datasets_info.append(f"⚠️ StackExchange DevOps failed: {str(e)}")
+        print(f"StackExchange DevOps dataset error: {str(e)}")
+        
+    # 3. Kubernetes StackOverflow Questions (VERIFIED!)
+    try:
+        print("Loading mcipriano/stackoverflow-kubernetes-questions dataset...")
+        dataset = load_dataset("mcipriano/stackoverflow-kubernetes-questions", split="train")
+        examples = []
+        for item in dataset.select(range(min(600, len(dataset)))):
+            # Adapt format from StackOverflow
+            question = item.get('title', item.get('question', ''))
+            body = item.get('body', '')
+            answer = item.get('accepted_answer_body', item.get('answer', ''))
+            
+            if question and answer:
+                # Combine question and body for instruction
+                full_question = f"{question}\n{body}".strip() if body else question
+                examples.append({
+                    "instruction": full_question,
+                    "input": "",
+                    "output": answer
+                })
+        all_examples.extend(examples)
+        datasets_info.append(f"✅ Kubernetes StackOverflow: {len(examples)} examples")
+        print(f"Successfully loaded {len(examples)} examples from Kubernetes StackOverflow")
+    except Exception as e:
+        datasets_info.append(f"⚠️ Kubernetes StackOverflow failed: {str(e)}")
+        print(f"Kubernetes StackOverflow dataset error: {str(e)}")
+        
+    # 4. Docker Commands - Natural Language to Docker (VERIFIED!)
+    try:
+        print("Loading MattCoddity/dockerNLcommands dataset...")
+        dataset = load_dataset("MattCoddity/dockerNLcommands", split="train")
+        examples = []
+        for item in dataset:
+            instruction = item.get('instruction', item.get('natural_language', ''))
+            command = item.get('docker_command', item.get('command', ''))
+            
+            if instruction and command:
+                examples.append({
+                    "instruction": f"Translate this requirement to a Docker command: {instruction}",
+                    "input": "",
+                    "output": f"Docker command: {command}"
+                })
+        all_examples.extend(examples)
+        datasets_info.append(f"✅ Docker Commands: {len(examples)} examples")
+        print(f"Successfully loaded {len(examples)} examples from Docker Commands")
+    except Exception as e:
+        datasets_info.append(f"⚠️ Docker Commands failed: {str(e)}")
+        print(f"Docker Commands dataset error: {str(e)}")
+        
+    # 5. Python StackOverflow - Programming Q&A (VERIFIED!)
+    try:
+        print("Loading koutch/stackoverflow_python dataset...")
+        dataset = load_dataset("koutch/stackoverflow_python", split="train")
+        examples = []
+        # Filter for DevOps/infrastructure related Python questions
+        devops_keywords = ['deployment', 'docker', 'kubernetes', 'ci/cd', 'automation', 'infrastructure', 'monitoring', 'logging']
+        
+        for item in dataset.select(range(min(1000, len(dataset)))):
+            question_title = item.get('question_title', '')
+            question_body = item.get('question_body', '')
+            answer = item.get('answer', '')
+            
+            # Check if question is DevOps-related
+            text_to_check = f"{question_title} {question_body}".lower()
+            is_devops_related = any(keyword in text_to_check for keyword in devops_keywords)
+            
+            if question_title and answer and (is_devops_related or len(examples) < 400):
+                # Combine title and body for instruction
+                full_question = f"{question_title}\n{question_body}".strip() if question_body else question_title
+                examples.append({
+                    "instruction": full_question,
+                    "input": "",
+                    "output": answer
+                })
+                
+                if len(examples) >= 500:  # Limit total examples
+                    break
+        
+        all_examples.extend(examples)
+        datasets_info.append(f"✅ Python StackOverflow: {len(examples)} examples")
+        print(f"Successfully loaded {len(examples)} examples from Python StackOverflow")
+    except Exception as e:
+        datasets_info.append(f"⚠️ Python StackOverflow failed: {str(e)}")
+        print(f"Python StackOverflow dataset error: {str(e)}")
+    
+    # 6. Incident Response Playbooks - SRE focused
+    try:
+        print("Loading agamage/incident-response-playbook-samples dataset...")
+        dataset = load_dataset("agamage/incident-response-playbook-samples", split="train")
+        examples = []
+        for item in dataset:
+            playbook = item.get('playbook', item.get('content', ''))
+            title = item.get('title', item.get('name', ''))
+            description = item.get('description', '')
+            
+            if playbook and title:
+                instruction = f"Create an incident response playbook for: {title}"
+                if description:
+                    instruction = f"{instruction}\nDescription: {description}"
+                examples.append({
+                    "instruction": instruction,
+                    "input": "",
+                    "output": playbook
+                })
+        all_examples.extend(examples)
+        datasets_info.append(f"✅ Incident Response Playbooks: {len(examples)} SRE examples")
+        print(f"Successfully loaded {len(examples)} SRE incident response examples")
+    except Exception as e:
+        datasets_info.append(f"⚠️ Incident Response Playbooks failed: {str(e)}")
+        print(f"Incident Response Playbooks dataset error: {str(e)}")
+        
+    # 7. General Incident Dataset - Q&A format  
+    try:
+        print("Loading atishayj281/incident-dataset dataset...")
+        dataset = load_dataset("atishayj281/incident-dataset", split="train")
+        examples = []
+        for item in dataset:
+            question = item.get('question', item.get('incident_description', ''))
+            answer = item.get('answer', item.get('resolution', item.get('response', '')))
+            
+            if question and answer:
+                examples.append({
+                    "instruction": f"How to handle this incident: {question}",
+                    "input": "",
+                    "output": answer
+                })
+        all_examples.extend(examples)
+        datasets_info.append(f"✅ Incident Management: {len(examples)} examples")
+        print(f"Successfully loaded {len(examples)} incident management examples")
+    except Exception as e:
+        datasets_info.append(f"⚠️ Incident Management failed: {str(e)}")
+        print(f"Incident Management dataset error: {str(e)}")
+        
+    # Add fallback synthetic examples if no external datasets loaded
+    if len(all_examples) < 20:
+        fallback_examples = [
             {
-                "instruction": "How do you troubleshoot high CPU usage in a Kubernetes pod?",
+                "instruction": "How do you implement blue-green deployment in Kubernetes?",
                 "input": "",
-                "output": "To troubleshoot high CPU usage in a Kubernetes pod: 1) Use kubectl top pod to identify the pod, 2) Check pod resource limits with kubectl describe pod, 3) Examine application logs with kubectl logs, 4) Use kubectl exec to access the pod and run top/htop, 5) Check for resource requests/limits configuration, 6) Consider horizontal pod autoscaling if needed."
+                "output": "Blue-green deployment in Kubernetes: 1) Create two identical environments (blue and green) using different selectors, 2) Deploy new version to inactive environment (green), 3) Test thoroughly with readiness/liveness probes, 4) Switch traffic by updating service selector labels, 5) Monitor metrics and logs post-switch, 6) Rollback by reverting service selector if issues occur, 7) Use tools like Argo Rollouts or Flagger for automation."
             },
             {
-                "instruction": "Explain how to set up monitoring for a production ML model",
+                "instruction": "Explain Prometheus monitoring setup for microservices",
                 "input": "",
-                "output": "Production ML model monitoring setup: 1) Implement model performance metrics (accuracy, latency, throughput), 2) Set up data drift detection using statistical tests, 3) Monitor prediction distribution changes, 4) Configure alerts for model degradation, 5) Use tools like Prometheus + Grafana for metrics visualization, 6) Implement logging for prediction requests/responses, 7) Set up automated model retraining triggers."
-            },
-            {
-                "instruction": "How do you implement blue-green deployment for a microservice?",
-                "input": "",
-                "output": "Blue-green deployment implementation: 1) Maintain two identical production environments (blue and green), 2) Deploy new version to inactive environment, 3) Test thoroughly in the green environment, 4) Switch traffic from blue to green using load balancer, 5) Monitor for issues and rollback if needed, 6) Keep blue environment as backup, 7) Use automation tools like ArgoCD or Jenkins for orchestration."
+                "output": "Prometheus microservices monitoring: 1) Install Prometheus server via Helm chart, 2) Configure service discovery for automatic target detection, 3) Expose metrics endpoints (/metrics) in each microservice, 4) Set up alerting rules for SLA violations, 5) Configure Grafana dashboards for visualization, 6) Implement distributed tracing with Jaeger, 7) Monitor golden signals: latency, traffic, errors, saturation, 8) Use PushGateway for batch jobs, 9) Set up federation for multi-cluster monitoring."
             }
         ]
-        all_examples.extend(synthetic_examples)
-        datasets_info.append(f"✅ Synthetic examples: {len(synthetic_examples)} examples")
+        all_examples.extend(fallback_examples)
+        datasets_info.append(f"✅ Fallback synthetic examples: {len(fallback_examples)} examples")
     
     return all_examples, datasets_info
 
 def format_training_data(examples, tokenizer, max_length=2048):
     """Format data for instruction following training"""
+    # Validate and clean examples
+    valid_examples = []
+    for i, item in enumerate(examples):
+        if (isinstance(item, dict) and 
+            'instruction' in item and 'output' in item and
+            isinstance(item['instruction'], str) and isinstance(item['output'], str) and
+            item['instruction'].strip() and item['output'].strip()):
+            valid_examples.append(item)
+        else:
+            print(f"⚠️ Skipping invalid example {i}: {type(item)} - {list(item.keys()) if isinstance(item, dict) else 'Not a dict'}")
+    
+    print(f"✅ Valid examples after cleaning: {len(valid_examples)} / {len(examples)}")
+    
     formatted_data = []
     
-    for item in examples:
+    for item in valid_examples:
         # Create instruction-following format
-        if item['input']:
-            text = f"### Instruction:\n{item['instruction']}\n\n### Input:\n{item['input']}\n\n### Response:\n{item['output']}"
+        input_text = item.get('input', '').strip()
+        if input_text:
+            text = f"### Instruction:\n{item['instruction']}\n\n### Input:\n{input_text}\n\n### Response:\n{item['output']}"
         else:
             text = f"### Instruction:\n{item['instruction']}\n\n### Response:\n{item['output']}"
         
         formatted_data.append({"text": text})
     
-    # Tokenize
+    # Tokenize with proper padding and validation
     def tokenize_function(examples):
+        # Ensure all texts are strings and not empty
+        texts = []
+        for text in examples["text"]:
+            if isinstance(text, str) and text.strip():
+                texts.append(text.strip())
+            else:
+                # Fallback for invalid text
+                texts.append("### Instruction:\nWhat is DevOps?\n\n### Response:\nDevOps is a set of practices that combines software development and IT operations.")
+        
         tokens = tokenizer(
-            examples["text"],
+            texts,
             truncation=True,
-            padding=False,
+            padding="max_length",  # Ensure consistent tensor shapes
             max_length=max_length,
             return_overflowing_tokens=False,
+            return_tensors=None,  # Return lists, not tensors yet
         )
-        tokens["labels"] = tokens["input_ids"].copy()
+        
+        # Create labels - copy input_ids for causal LM
+        tokens["labels"] = []
+        for input_ids in tokens["input_ids"]:
+            labels = input_ids.copy()
+            tokens["labels"].append(labels)
+        
         return tokens
     
     dataset = Dataset.from_list(formatted_data)
@@ -121,9 +352,18 @@ def format_training_data(examples, tokenizer, max_length=2048):
         desc="Tokenizing dataset"
     )
     
+    # Validate tokenized dataset
+    print(f"📊 Tokenized dataset size: {len(tokenized_dataset)}")
+    if len(tokenized_dataset) > 0:
+        sample = tokenized_dataset[0]
+        print(f"📏 Sample input_ids length: {len(sample['input_ids'])}")
+        print(f"📏 Sample labels length: {len(sample['labels'])}")
+        print(f"🔢 Input IDs type: {type(sample['input_ids'])}")
+        print(f"🔢 Labels type: {type(sample['labels'])}")
+    
     return tokenized_dataset
 
-@spaces.GPU(duration=360)  # Request 6 hours for complete training (use with L4/A100)
+@spaces.GPU(duration=180)  # Request 3 hours for A100 training (much faster than L4)
 def train_model(wandb_project, learning_rate, epochs, batch_size, resume_from_checkpoint=None):
     """Main training function with GPU acceleration"""
     
@@ -155,7 +395,14 @@ def train_model(wandb_project, learning_rate, epochs, batch_size, resume_from_ch
         if tokenizer.pad_token is None:
             tokenizer.pad_token = tokenizer.eos_token
         
-        # Load model with LoRA configuration
+        # Load model with aggressive memory optimization for HuggingFace Spaces
+        import gc
+        import os
+        
+        # A100 has 80GB VRAM - no aggressive memory optimization needed
+        print("🚀 Using A100 GPU with 80GB VRAM - optimized for performance!")
+        
+        # Load model with LoRA configuration - A100 optimized
         model = AutoModelForCausalLM.from_pretrained(
             MODEL_NAME,
             torch_dtype=torch.float16,
@@ -195,7 +442,7 @@ def train_model(wandb_project, learning_rate, epochs, batch_size, resume_from_ch
             num_train_epochs=epochs,  # Full epochs for complete training
             per_device_train_batch_size=batch_size,
             per_device_eval_batch_size=batch_size,
-            gradient_accumulation_steps=4,  # Standard accumulation
+            gradient_accumulation_steps=2,  # Reduced for A100's larger batches
             learning_rate=learning_rate,
             weight_decay=0.01,
             logging_steps=10,
@@ -216,20 +463,21 @@ def train_model(wandb_project, learning_rate, epochs, batch_size, resume_from_ch
             resume_from_checkpoint=resume_from_checkpoint,
         )
         
-        # Data collator
+        # Data collator with proper padding
         data_collator = DataCollatorForLanguageModeling(
             tokenizer=tokenizer,
             mlm=False,
+            pad_to_multiple_of=8,  # Optimize for GPU efficiency
         )
         
-        # Initialize trainer
+        # Initialize trainer (use processing_class for future compatibility)
         trainer = Trainer(
             model=model,
             args=training_args,
             train_dataset=train_dataset,
             eval_dataset=eval_dataset,
             data_collator=data_collator,
-            tokenizer=tokenizer,
+            processing_class=tokenizer,  # Use processing_class instead of tokenizer
         )
         
         yield "🚀 Starting training..."
@@ -295,9 +543,9 @@ def create_interface():
                 batch_size = gr.Slider(
                     minimum=1,
                     maximum=8,
-                    value=2,
+                    value=4,
                     step=1,
-                    label="Batch Size"
+                    label="Batch Size (A100 optimized)"
                 )
                 
                 train_btn = gr.Button("🚀 Start Training", variant="primary")

@@ -1,3 +1,15 @@
+---
+title: Qwen DevOps Training Pipeline
+emoji: 🚀
+colorFrom: green
+colorTo: blue
+sdk: gradio
+sdk_version: "4.44.0"
+app_file: app.py
+pinned: false
+hw: a100-large
+---
+
 # 🤖 Qwen3-8B DevOps Foundation Model Training
 
 A HuggingFace Space for training a specialized DevOps/SRE model using Qwen3-8B base model.
