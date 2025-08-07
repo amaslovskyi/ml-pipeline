@@ -1,0 +1,934 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  name: qwen-foundational-training-pipeline-huggingface
+  namespace: argo
+spec:
+  serviceAccountName: argo-workflow-sa
+  entrypoint: qwen-hf-training-pipeline
+  arguments:
+    parameters:
+      - name: model-base
+        value: "Qwen/Qwen3-8B" # Base model for fine-tuning - Latest Qwen3
+      - name: dataset-name
+        value: "devops-sre-dataset"
+      - name: training-approach
+        value: "qlora" # LoRA, QLoRA, or full fine-tuning
+      - name: max-seq-length
+        value: "2048"
+      - name: learning-rate
+        value: "2e-4"
+      - name: epochs
+        value: "3"
+      - name: batch-size
+        value: "4" # Adjusted for memory efficiency
+      - name: gradient-accumulation-steps
+        value: "8"
+      - name: huggingface-token
+        value: "hf_token_placeholder"
+      - name: wandb-project
+        value: "qwen-trainig"
+      - name: hf-space-name
+        value: "qwen-devops-training"
+      - name: hf-organization
+        value: "your-org" # Update with your HF organization
+
+  templates:
+    - name: qwen-hf-training-pipeline
+      dag:
+        tasks:
+          # Prepare training data for HuggingFace
+          - name: prepare-hf-dataset
+            template: prepare-hf-data
+            arguments:
+              parameters:
+                - name: dataset-name
+                  value: "{{workflow.parameters.dataset-name}}"
+                - name: huggingface-token
+                  value: "{{workflow.parameters.huggingface-token}}"
+
+          # Create and deploy HuggingFace Space for training
+          - name: create-hf-training-space
+            template: create-hf-space
+            dependencies: [prepare-hf-dataset]
+            arguments:
+              parameters:
+                - name: model-base
+                  value: "{{workflow.parameters.model-base}}"
+                - name: training-approach
+                  value: "{{workflow.parameters.training-approach}}"
+                - name: max-seq-length
+                  value: "{{workflow.parameters.max-seq-length}}"
+                - name: learning-rate
+                  value: "{{workflow.parameters.learning-rate}}"
+                - name: epochs
+                  value: "{{workflow.parameters.epochs}}"
+                - name: batch-size
+                  value: "{{workflow.parameters.batch-size}}"
+                - name: gradient-accumulation-steps
+                  value: "{{workflow.parameters.gradient-accumulation-steps}}"
+                - name: wandb-project
+                  value: "{{workflow.parameters.wandb-project}}"
+                - name: hf-space-name
+                  value: "{{workflow.parameters.hf-space-name}}"
+                - name: hf-organization
+                  value: "{{workflow.parameters.hf-organization}}"
+                - name: huggingface-token
+                  value: "{{workflow.parameters.huggingface-token}}"
+
+          # Monitor training progress
+          - name: monitor-hf-training
+            template: monitor-training-progress
+            dependencies: [create-hf-training-space]
+            arguments:
+              parameters:
+                - name: hf-space-name
+                  value: "{{workflow.parameters.hf-space-name}}"
+                - name: hf-organization
+                  value: "{{workflow.parameters.hf-organization}}"
+                - name: huggingface-token
+                  value: "{{workflow.parameters.huggingface-token}}"
+
+          # Download trained model and sync to OneDrive
+          - name: sync-trained-model
+            template: download-and-sync-model
+            dependencies: [monitor-hf-training]
+            arguments:
+              parameters:
+                - name: hf-space-name
+                  value: "{{workflow.parameters.hf-space-name}}"
+                - name: hf-organization
+                  value: "{{workflow.parameters.hf-organization}}"
+                - name: huggingface-token
+                  value: "{{workflow.parameters.huggingface-token}}"
+
+    # Template for preparing data for HuggingFace training
+    - name: prepare-hf-data
+      inputs:
+        parameters:
+          - name: dataset-name
+          - name: huggingface-token
+      container:
+        image: python:3.11-slim
+        command: [bash]
+        env:
+          - name: HUGGINGFACE_HUB_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: huggingface-credentials
+                key: HF_TOKEN
+        args:
+          - -c
+          - |
+            echo "Preparing DevOps/SRE dataset for HuggingFace: {{inputs.parameters.dataset-name}}"
+
+            # Install required packages
+            pip install --no-cache-dir pandas numpy datasets huggingface_hub
+            pip install --no-cache-dir 'dvc==3.61.0'
+
+            # Initialize DVC and get local data
+            dvc init --no-scm
+            dvc remote add -d onedrive /Users/amaslovs/Library/CloudStorage/OneDrive-SoftServe,Inc/MLOps-DVC-Storage
+
+            # Create dataset directories
+            mkdir -p data/raw data/processed
+
+            # Generate DevOps/SRE specific training data
+            python -c "
+            import pandas as pd
+            import json
+            import os
+            from datasets import Dataset
+            from huggingface_hub import HfApi, login
+
+            # Login to HuggingFace
+            login(token='$HUGGINGFACE_HUB_TOKEN')
+
+            # DevOps/SRE domain-specific training examples
+            devops_data = [
+                {
+                    'instruction': 'How do you troubleshoot high CPU usage in a Kubernetes pod?',
+                    'input': '',
+                    'output': 'To troubleshoot high CPU usage in a Kubernetes pod: 1) Use kubectl top pod to identify the pod, 2) Check pod resource limits with kubectl describe pod, 3) Examine application logs with kubectl logs, 4) Use kubectl exec to access the pod and run top/htop, 5) Check for resource requests/limits configuration, 6) Consider horizontal pod autoscaling if needed.'
+                },
+                {
+                    'instruction': 'Explain how to set up monitoring for a production ML model',
+                    'input': '',
+                    'output': 'Production ML model monitoring setup: 1) Implement model performance metrics (accuracy, latency, throughput), 2) Set up data drift detection using statistical tests, 3) Monitor prediction distribution changes, 4) Configure alerts for model degradation, 5) Use tools like Prometheus + Grafana for metrics visualization, 6) Implement logging for prediction requests/responses, 7) Set up automated model retraining triggers.'
+                },
+                {
+                    'instruction': 'How do you implement blue-green deployment for a microservice?',
+                    'input': '',
+                    'output': 'Blue-green deployment implementation: 1) Maintain two identical production environments (blue and green), 2) Deploy new version to inactive environment, 3) Test thoroughly in the green environment, 4) Switch traffic from blue to green using load balancer, 5) Monitor for issues and rollback if needed, 6) Keep blue environment as backup, 7) Use automation tools like ArgoCD or Jenkins for orchestration.'
+                },
+                {
+                    'instruction': 'What are the key considerations for designing a fault-tolerant distributed system?',
+                    'input': '',
+                    'output': 'Key fault-tolerant distributed system considerations: 1) Implement circuit breakers for external dependencies, 2) Use redundancy across multiple availability zones, 3) Design for graceful degradation, 4) Implement proper retry logic with exponential backoff, 5) Use health checks and automatic failover, 6) Ensure data consistency with appropriate patterns (eventual consistency, ACID), 7) Monitor system health and performance metrics, 8) Plan for disaster recovery scenarios.'
+                },
+                {
+                    'instruction': 'How do you optimize Docker container security?',
+                    'input': '',
+                    'output': 'Docker container security optimization: 1) Use minimal base images (alpine, distroless), 2) Run containers as non-root user, 3) Implement multi-stage builds to reduce attack surface, 4) Scan images for vulnerabilities using tools like Trivy, 5) Use secrets management instead of environment variables, 6) Configure security contexts and pod security policies, 7) Enable runtime security monitoring, 8) Regularly update base images and dependencies.'
+                },
+                {
+                    'instruction': 'Explain the difference between horizontal and vertical scaling',
+                    'input': '',
+                    'output': 'Horizontal vs Vertical scaling: Horizontal scaling (scale out) adds more machines/instances to handle load, providing better fault tolerance and unlimited scaling potential but requires application to be stateless. Vertical scaling (scale up) increases resources (CPU, RAM) of existing machines, simpler to implement but has hardware limits and single point of failure. Choose horizontal for web applications, vertical for databases with strict consistency requirements.'
+                },
+                {
+                    'instruction': 'How do you implement proper logging in a microservices architecture?',
+                    'input': '',
+                    'output': 'Microservices logging implementation: 1) Use structured logging (JSON format), 2) Implement correlation IDs for request tracing, 3) Centralize logs using ELK stack or similar, 4) Include service name, version, and environment in all logs, 5) Log at appropriate levels (ERROR, WARN, INFO, DEBUG), 6) Avoid logging sensitive information, 7) Implement log aggregation and retention policies, 8) Use distributed tracing for cross-service requests.'
+                },
+                {
+                    'instruction': 'What is Infrastructure as Code and what are its benefits?',
+                    'input': '',
+                    'output': 'Infrastructure as Code (IaC) manages infrastructure through code rather than manual processes. Benefits include: 1) Version control for infrastructure changes, 2) Reproducible and consistent environments, 3) Faster provisioning and deployment, 4) Reduced human errors, 5) Better collaboration through code reviews, 6) Cost optimization through resource management, 7) Disaster recovery through code-based recreation. Tools include Terraform, CloudFormation, Pulumi.'
+                },
+                {
+                    'instruction': 'How do you handle secrets management in Kubernetes?',
+                    'input': '',
+                    'output': 'Kubernetes secrets management: 1) Use Kubernetes Secrets for basic secret storage, 2) Implement external secret management (HashiCorp Vault, AWS Secrets Manager), 3) Enable encryption at rest, 4) Use RBAC to control secret access, 5) Rotate secrets regularly, 6) Avoid hardcoding secrets in container images, 7) Use service accounts with minimal permissions, 8) Consider sealed secrets or external secret operators for GitOps workflows.'
+                },
+                {
+                    'instruction': 'Explain how to implement automated testing in CI/CD pipelines',
+                    'input': '',
+                    'output': 'Automated testing in CI/CD: 1) Implement unit tests for individual components, 2) Add integration tests for service interactions, 3) Include security scanning (SAST/DAST), 4) Run performance and load tests, 5) Implement contract testing for APIs, 6) Use test pyramids (more unit tests, fewer E2E tests), 7) Parallel test execution for faster feedback, 8) Fail fast and provide clear feedback, 9) Include smoke tests in production deployments.'
+                },
+                {
+                    'instruction': 'How do you implement disaster recovery for cloud applications?',
+                    'input': '',
+                    'output': 'Cloud disaster recovery implementation: 1) Define RTO and RPO requirements, 2) Implement multi-region deployment, 3) Set up automated backups with point-in-time recovery, 4) Use database replication across regions, 5) Implement health checks and automatic failover, 6) Create disaster recovery runbooks, 7) Test recovery procedures regularly, 8) Use Infrastructure as Code for rapid environment recreation.'
+                },
+                {
+                    'instruction': 'What are the best practices for container orchestration?',
+                    'input': '',
+                    'output': 'Container orchestration best practices: 1) Use resource limits and requests, 2) Implement health checks (liveness and readiness probes), 3) Use rolling updates for zero-downtime deployments, 4) Implement horizontal pod autoscaling, 5) Use namespaces for environment isolation, 6) Store secrets in secure secret management systems, 7) Implement network policies for security, 8) Monitor resource usage and performance metrics.'
+                }
+            ]
+
+            # Convert to HuggingFace dataset format
+            df = pd.DataFrame(devops_data)
+            print(f'Created dataset with {len(df)} DevOps/SRE examples')
+
+            # Create instruction-following format for training
+            processed_data = []
+            for item in devops_data:
+                if item['input']:
+                    text = f\"<|im_start|>system\nYou are a helpful DevOps and SRE assistant.<|im_end|>\n<|im_start|>user\n{item['instruction']}\n{item['input']}<|im_end|>\n<|im_start|>assistant\n{item['output']}<|im_end|>\"
+                else:
+                    text = f\"<|im_start|>system\nYou are a helpful DevOps and SRE assistant.<|im_end|>\n<|im_start|>user\n{item['instruction']}<|im_end|>\n<|im_start|>assistant\n{item['output']}<|im_end|>\"
+                processed_data.append({'text': text})
+
+            # Create HuggingFace Dataset
+            from datasets import Dataset
+            hf_dataset = Dataset.from_list(processed_data)
+
+            # Save dataset locally
+            hf_dataset.save_to_disk('devops_sre_dataset_hf')
+
+            # Upload to HuggingFace Hub
+            dataset_name = 'devops-sre-training-dataset'
+            try:
+                hf_dataset.push_to_hub(
+                    dataset_name,
+                    private=True,
+                    token='$HUGGINGFACE_HUB_TOKEN'
+                )
+                print(f'✅ Dataset uploaded to HuggingFace Hub: {dataset_name}')
+            except Exception as e:
+                print(f'⚠️ Failed to upload to HF Hub: {e}')
+                print('Dataset will be created locally in the training space')
+
+            print(f'Dataset preparation completed: {len(processed_data)} training examples')
+            print('Dataset format: Qwen chat template with system messages')
+            "
+
+            # Save to OneDrive for backup
+            dvc add devops_sre_dataset_hf/
+            dvc push || echo "DVC push failed, continuing..."
+
+            echo "HuggingFace dataset prepared successfully"
+        resources:
+          requests:
+            memory: "2Gi"
+            cpu: "1"
+          limits:
+            memory: "4Gi"
+            cpu: "2"
+
+    # Template for creating HuggingFace Space for training
+    - name: create-hf-space
+      inputs:
+        parameters:
+          - name: model-base
+          - name: training-approach
+          - name: max-seq-length
+          - name: learning-rate
+          - name: epochs
+          - name: batch-size
+          - name: gradient-accumulation-steps
+          - name: wandb-project
+          - name: hf-space-name
+          - name: hf-organization
+          - name: huggingface-token
+      container:
+        image: python:3.11-slim
+        command: [bash]
+        env:
+          - name: HUGGINGFACE_HUB_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: huggingface-credentials
+                key: HF_TOKEN
+          - name: WANDB_API_KEY
+            valueFrom:
+              secretKeyRef:
+                name: wandb-credentials
+                key: WANDB_API_KEY
+        args:
+          - -c
+          - |
+            echo "Creating HuggingFace Space for training: {{inputs.parameters.hf-space-name}}"
+
+            # Install required packages
+            pip install --no-cache-dir huggingface_hub gradio
+
+            # Create training script for HuggingFace Space
+            mkdir -p hf-training-space
+            cd hf-training-space
+
+            # Create app.py for the training space
+            cat > app.py << 'EOF'
+            import gradio as gr
+            import torch
+            import os
+            import json
+            import wandb
+            from datetime import datetime
+            from transformers import (
+                AutoTokenizer, 
+                AutoModelForCausalLM,
+                TrainingArguments,
+                Trainer,
+                DataCollatorForLanguageModeling,
+                BitsAndBytesConfig
+            )
+            from peft import LoraConfig, get_peft_model, TaskType, PeftModel
+            from datasets import load_dataset, Dataset
+            import subprocess
+            import time
+
+            # Configuration from environment or defaults
+            MODEL_NAME = os.getenv("MODEL_BASE", "{{inputs.parameters.model-base}}")
+            TRAINING_APPROACH = os.getenv("TRAINING_APPROACH", "{{inputs.parameters.training-approach}}")
+            MAX_LENGTH = int(os.getenv("MAX_SEQ_LENGTH", "{{inputs.parameters.max-seq-length}}"))
+            LEARNING_RATE = float(os.getenv("LEARNING_RATE", "{{inputs.parameters.learning-rate}}"))
+            EPOCHS = int(os.getenv("EPOCHS", "{{inputs.parameters.epochs}}"))
+            BATCH_SIZE = int(os.getenv("BATCH_SIZE", "{{inputs.parameters.batch-size}}"))
+            GRAD_ACCUM_STEPS = int(os.getenv("GRADIENT_ACCUMULATION_STEPS", "{{inputs.parameters.gradient-accumulation-steps}}"))
+            WANDB_PROJECT = os.getenv("WANDB_PROJECT", "{{inputs.parameters.wandb-project}}")
+
+            # Global variables
+            training_status = {"status": "idle", "progress": 0, "logs": []}
+            model = None
+            tokenizer = None
+
+            def log_message(message):
+                timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                log_entry = f"[{timestamp}] {message}"
+                training_status["logs"].append(log_entry)
+                print(log_entry)
+                return log_entry
+
+            def download_dataset():
+                """Download or create the DevOps dataset"""
+                try:
+                    # Try to load from HuggingFace Hub first
+                    dataset = load_dataset("devops-sre-training-dataset", split="train")
+                    log_message("✅ Loaded dataset from HuggingFace Hub")
+                    return dataset
+                except:
+                    log_message("⚠️ Could not load from HF Hub, creating dataset locally")
+                    return create_local_dataset()
+
+            def create_local_dataset():
+                """Create the DevOps dataset locally"""
+                devops_data = [
+                    {"text": "<|im_start|>system\\nYou are a helpful DevOps and SRE assistant.<|im_end|>\\n<|im_start|>user\\nHow do you troubleshoot high CPU usage in a Kubernetes pod?<|im_end|>\\n<|im_start|>assistant\\nTo troubleshoot high CPU usage in a Kubernetes pod: 1) Use kubectl top pod to identify the pod, 2) Check pod resource limits with kubectl describe pod, 3) Examine application logs with kubectl logs, 4) Use kubectl exec to access the pod and run top/htop, 5) Check for resource requests/limits configuration, 6) Consider horizontal pod autoscaling if needed.<|im_end|>"},
+                    {"text": "<|im_start|>system\\nYou are a helpful DevOps and SRE assistant.<|im_end|>\\n<|im_start|>user\\nExplain how to set up monitoring for a production ML model<|im_end|>\\n<|im_start|>assistant\\nProduction ML model monitoring setup: 1) Implement model performance metrics (accuracy, latency, throughput), 2) Set up data drift detection using statistical tests, 3) Monitor prediction distribution changes, 4) Configure alerts for model degradation, 5) Use tools like Prometheus + Grafana for metrics visualization, 6) Implement logging for prediction requests/responses, 7) Set up automated model retraining triggers.<|im_end|>"},
+                    {"text": "<|im_start|>system\\nYou are a helpful DevOps and SRE assistant.<|im_end|>\\n<|im_start|>user\\nHow do you implement blue-green deployment for a microservice?<|im_end|>\\n<|im_start|>assistant\\nBlue-green deployment implementation: 1) Maintain two identical production environments (blue and green), 2) Deploy new version to inactive environment, 3) Test thoroughly in the green environment, 4) Switch traffic from blue to green using load balancer, 5) Monitor for issues and rollback if needed, 6) Keep blue environment as backup, 7) Use automation tools like ArgoCD or Jenkins for orchestration.<|im_end|>"}
+                ]
+                
+                return Dataset.from_list(devops_data)
+
+            def start_training():
+                """Start the training process"""
+                global model, tokenizer, training_status
+                
+                try:
+                    training_status = {"status": "initializing", "progress": 0, "logs": []}
+                    log_message("🚀 Starting Qwen DevOps foundation model training")
+                    
+                    # Initialize W&B
+                    if os.getenv("WANDB_API_KEY"):
+                        wandb.init(
+                            project=WANDB_PROJECT,
+                            name=f"qwen-devops-{TRAINING_APPROACH}-hf-space",
+                            config={
+                                "model": MODEL_NAME,
+                                "max_length": MAX_LENGTH,
+                                "learning_rate": LEARNING_RATE,
+                                "epochs": EPOCHS,
+                                "batch_size": BATCH_SIZE,
+                                "gradient_accumulation_steps": GRAD_ACCUM_STEPS,
+                                "training_approach": TRAINING_APPROACH
+                            }
+                        )
+                        log_message("✅ W&B initialized")
+                    
+                    # Load tokenizer
+                    log_message(f"📥 Loading tokenizer: {MODEL_NAME}")
+                    tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
+                    if tokenizer.pad_token is None:
+                        tokenizer.pad_token = tokenizer.eos_token
+                    
+                    training_status["progress"] = 10
+                    
+                    # Load model with appropriate configuration
+                    log_message(f"📥 Loading model: {MODEL_NAME}")
+                    if TRAINING_APPROACH.lower() in ["qlora", "lora"]:
+                        bnb_config = BitsAndBytesConfig(
+                            load_in_4bit=True,
+                            bnb_4bit_quant_type="nf4",
+                            bnb_4bit_compute_dtype=torch.float16,
+                            bnb_4bit_use_double_quant=True,
+                        )
+                        
+                        model = AutoModelForCausalLM.from_pretrained(
+                            MODEL_NAME,
+                            quantization_config=bnb_config if TRAINING_APPROACH.lower() == "qlora" else None,
+                            torch_dtype=torch.float16,
+                            device_map="auto"
+                        )
+                        
+                        # Configure LoRA
+                        lora_config = LoraConfig(
+                            task_type=TaskType.CAUSAL_LM,
+                            inference_mode=False,
+                            r=16,
+                            lora_alpha=32,
+                            lora_dropout=0.1,
+                            target_modules=["q_proj", "v_proj", "k_proj", "o_proj"]
+                        )
+                        
+                        model = get_peft_model(model, lora_config)
+                        model.print_trainable_parameters()
+                        log_message("✅ LoRA configuration applied")
+                    else:
+                        model = AutoModelForCausalLM.from_pretrained(
+                            MODEL_NAME,
+                            torch_dtype=torch.float16,
+                            device_map="auto"
+                        )
+                    
+                    training_status["progress"] = 30
+                    log_message("✅ Model loaded successfully")
+                    
+                    # Load dataset
+                    log_message("📥 Loading training dataset")
+                    dataset = download_dataset()
+                    
+                    # Tokenize dataset
+                    def tokenize_function(examples):
+                        tokens = tokenizer(
+                            examples["text"],
+                            truncation=True,
+                            padding=False,
+                            max_length=MAX_LENGTH,
+                            return_overflowing_tokens=False,
+                        )
+                        tokens["labels"] = tokens["input_ids"].copy()
+                        return tokens
+                    
+                    tokenized_dataset = dataset.map(
+                        tokenize_function,
+                        batched=True,
+                        remove_columns=dataset.column_names,
+                        desc="Tokenizing dataset"
+                    )
+                    
+                    # Split dataset
+                    split_dataset = tokenized_dataset.train_test_split(test_size=0.1, seed=42)
+                    train_dataset = split_dataset["train"]
+                    eval_dataset = split_dataset["test"]
+                    
+                    training_status["progress"] = 50
+                    log_message(f"✅ Dataset prepared - Train: {len(train_dataset)}, Eval: {len(eval_dataset)}")
+                    
+                    # Setup training
+                    data_collator = DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False)
+                    
+                    training_args = TrainingArguments(
+                        output_dir="./qwen-devops-foundation",
+                        num_train_epochs=EPOCHS,
+                        per_device_train_batch_size=BATCH_SIZE,
+                        per_device_eval_batch_size=BATCH_SIZE,
+                        gradient_accumulation_steps=GRAD_ACCUM_STEPS,
+                        learning_rate=LEARNING_RATE,
+                        weight_decay=0.01,
+                        logging_steps=5,
+                        eval_steps=50,
+                        save_steps=100,
+                        evaluation_strategy="steps",
+                        save_strategy="steps",
+                        load_best_model_at_end=True,
+                        metric_for_best_model="eval_loss",
+                        greater_is_better=False,
+                        warmup_steps=10,
+                        lr_scheduler_type="cosine",
+                        fp16=True,
+                        dataloader_pin_memory=True,
+                        remove_unused_columns=False,
+                        report_to="wandb" if os.getenv("WANDB_API_KEY") else "none",
+                        run_name=f"qwen-devops-{TRAINING_APPROACH}-hf",
+                    )
+                    
+                    trainer = Trainer(
+                        model=model,
+                        args=training_args,
+                        train_dataset=train_dataset,
+                        eval_dataset=eval_dataset,
+                        data_collator=data_collator,
+                        tokenizer=tokenizer,
+                    )
+                    
+                    training_status["status"] = "training"
+                    training_status["progress"] = 60
+                    log_message("🏃 Starting training process...")
+                    
+                    # Start training
+                    trainer.train()
+                    
+                    training_status["progress"] = 90
+                    log_message("💾 Saving trained model...")
+                    
+                    # Save model
+                    trainer.save_model("./qwen-devops-foundation")
+                    tokenizer.save_pretrained("./qwen-devops-foundation")
+                    
+                    # Save training metrics
+                    metrics = trainer.state.log_history
+                    with open("./qwen-devops-foundation/training_metrics.json", "w") as f:
+                        json.dump(metrics, f, indent=2)
+                    
+                    # Upload to HuggingFace Hub
+                    try:
+                        model.push_to_hub("qwen-devops-foundation", token=os.getenv("HUGGINGFACE_HUB_TOKEN"))
+                        tokenizer.push_to_hub("qwen-devops-foundation", token=os.getenv("HUGGINGFACE_HUB_TOKEN"))
+                        log_message("✅ Model uploaded to HuggingFace Hub")
+                    except Exception as e:
+                        log_message(f"⚠️ Failed to upload to HF Hub: {e}")
+                    
+                    training_status["status"] = "completed"
+                    training_status["progress"] = 100
+                    log_message("🎉 Training completed successfully!")
+                    
+                    if os.getenv("WANDB_API_KEY"):
+                        wandb.finish()
+                    
+                    return "Training completed successfully!"
+                    
+                except Exception as e:
+                    error_msg = f"❌ Training failed: {str(e)}"
+                    log_message(error_msg)
+                    training_status["status"] = "failed"
+                    return error_msg
+
+            def get_training_status():
+                """Get current training status"""
+                return (
+                    training_status["status"],
+                    training_status["progress"],
+                    "\\n".join(training_status["logs"][-10:])  # Last 10 log entries
+                )
+
+            def test_model(prompt):
+                """Test the trained model"""
+                global model, tokenizer
+                
+                if model is None or tokenizer is None:
+                    return "Model not loaded. Please complete training first."
+                
+                try:
+                    # Format prompt
+                    formatted_prompt = f"<|im_start|>system\\nYou are a helpful DevOps and SRE assistant.<|im_end|>\\n<|im_start|>user\\n{prompt}<|im_end|>\\n<|im_start|>assistant\\n"
+                    
+                    inputs = tokenizer(formatted_prompt, return_tensors="pt")
+                    
+                    with torch.no_grad():
+                        outputs = model.generate(
+                            **inputs,
+                            max_new_tokens=200,
+                            temperature=0.7,
+                            do_sample=True,
+                            pad_token_id=tokenizer.eos_token_id
+                        )
+                    
+                    response = tokenizer.decode(outputs[0], skip_special_tokens=True)
+                    # Extract just the assistant response
+                    if "<|im_start|>assistant\\n" in response:
+                        response = response.split("<|im_start|>assistant\\n")[-1]
+                    
+                    return response
+                    
+                except Exception as e:
+                    return f"Error during inference: {str(e)}"
+
+            # Gradio interface
+            with gr.Blocks(title="Qwen DevOps Foundation Model Training") as demo:
+                gr.Markdown("# 🚀 Qwen DevOps Foundation Model Training")
+                gr.Markdown("Train a specialized Qwen model for DevOps and SRE tasks using HuggingFace infrastructure.")
+                
+                with gr.Tab("Training"):
+                    gr.Markdown("## Training Configuration")
+                    gr.Markdown(f"""
+                    - **Model**: {MODEL_NAME}
+                    - **Approach**: {TRAINING_APPROACH}
+                    - **Learning Rate**: {LEARNING_RATE}
+                    - **Epochs**: {EPOCHS}
+                    - **Batch Size**: {BATCH_SIZE}
+                    - **Max Length**: {MAX_LENGTH}
+                    """)
+                    
+                    start_btn = gr.Button("🚀 Start Training", variant="primary")
+                    
+                    with gr.Row():
+                        status_text = gr.Textbox(label="Status", value="idle")
+                        progress_bar = gr.Slider(label="Progress", minimum=0, maximum=100, value=0)
+                    
+                    logs_output = gr.Textbox(label="Training Logs", lines=10, max_lines=20)
+                    
+                    # Auto-refresh training status
+                    def refresh_status():
+                        status, progress, logs = get_training_status()
+                        return status, progress, logs
+                    
+                    timer = gr.Timer(5)  # Refresh every 5 seconds
+                    timer.tick(refresh_status, outputs=[status_text, progress_bar, logs_output])
+                    
+                    start_btn.click(start_training, outputs=[logs_output])
+                
+                with gr.Tab("Testing"):
+                    gr.Markdown("## Test the Trained Model")
+                    test_input = gr.Textbox(
+                        label="DevOps/SRE Question",
+                        placeholder="How do you troubleshoot a Kubernetes deployment failure?",
+                        lines=3
+                    )
+                    test_btn = gr.Button("🧪 Test Model")
+                    test_output = gr.Textbox(label="Model Response", lines=8)
+                    
+                    test_btn.click(test_model, inputs=[test_input], outputs=[test_output])
+                    
+                    # Example questions
+                    gr.Markdown("### Example Questions:")
+                    examples = [
+                        "How do you implement monitoring for microservices?",
+                        "What are the best practices for container security?",
+                        "How do you troubleshoot high memory usage in Kubernetes?",
+                        "Explain blue-green deployment strategy"
+                    ]
+                    
+                    for example in examples:
+                        gr.Button(example, size="sm").click(
+                            lambda x=example: x, outputs=[test_input]
+                        )
+
+            if __name__ == "__main__":
+                demo.launch(share=True, server_name="0.0.0.0", server_port=7860)
+            EOF
+
+            # Create requirements.txt
+            cat > requirements.txt << 'EOF'
+            torch>=2.0.0
+            transformers>=4.35.0
+            datasets>=2.14.0
+            peft>=0.6.0
+            bitsandbytes>=0.41.0
+            accelerate>=0.24.0
+            gradio>=4.0.0
+            wandb>=0.16.0
+            huggingface_hub>=0.18.0
+            EOF
+
+            # Create README.md
+            cat > README.md << 'EOF'
+            ---
+            title: Qwen DevOps Foundation Model Training
+            emoji: 🚀
+            colorFrom: blue
+            colorTo: purple
+            sdk: gradio
+            sdk_version: 4.0.0
+            app_file: app.py
+            pinned: false
+            license: mit
+            ---
+
+            # Qwen DevOps Foundation Model Training
+
+            This HuggingFace Space trains a specialized Qwen model for DevOps and SRE tasks.
+
+            ## Features
+            - Fine-tune Qwen2.5-8B for DevOps/SRE domain
+            - LoRA/QLoRA efficient training
+            - Real-time training monitoring
+            - Model testing interface
+            - W&B experiment tracking
+
+            ## Usage
+            1. Click "Start Training" to begin the fine-tuning process
+            2. Monitor progress in real-time
+            3. Test the trained model with DevOps questions
+
+            ## Training Data
+            Specialized dataset covering:
+            - Kubernetes troubleshooting
+            - Infrastructure as Code
+            - CI/CD best practices
+            - Monitoring and alerting
+            - Security practices
+            - Disaster recovery
+            EOF
+
+            # Upload to HuggingFace Hub as a Space
+            from huggingface_hub import HfApi, login
+
+            login(token='$HUGGINGFACE_HUB_TOKEN')
+            api = HfApi()
+
+            space_name = "{{inputs.parameters.hf-space-name}}"
+            org_name = "{{inputs.parameters.hf-organization}}"
+
+            try:
+                # Create the space
+                space_url = api.create_repo(
+                    repo_id=f"{org_name}/{space_name}",
+                    repo_type="space",
+                    space_sdk="gradio",
+                    private=False
+                )
+                
+                # Upload files
+                api.upload_folder(
+                    folder_path=".",
+                    repo_id=f"{org_name}/{space_name}",
+                    repo_type="space",
+                    token='$HUGGINGFACE_HUB_TOKEN'
+                )
+                
+                echo "✅ HuggingFace Space created successfully: $space_url"
+                echo "🔗 Access your training space at: https://huggingface.co/spaces/{org_name}/{space_name}"
+                
+            except Exception as e:
+                echo "❌ Failed to create HuggingFace Space: $e"
+                echo "Please check your HuggingFace token and organization name"
+                exit 1
+            fi
+        resources:
+          requests:
+            memory: "4Gi"
+            cpu: "2"
+          limits:
+            memory: "8Gi"
+            cpu: "4"
+
+    # Template for monitoring training progress
+    - name: monitor-training-progress
+      inputs:
+        parameters:
+          - name: hf-space-name
+          - name: hf-organization
+          - name: huggingface-token
+      container:
+        image: python:3.11-slim
+        command: [bash]
+        env:
+          - name: HUGGINGFACE_HUB_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: huggingface-credentials
+                key: HF_TOKEN
+        args:
+          - -c
+          - |
+            echo "Monitoring HuggingFace Space training: {{inputs.parameters.hf-space-name}}"
+
+            pip install --no-cache-dir huggingface_hub requests
+
+            python -c "
+            import time
+            import requests
+            from huggingface_hub import HfApi, login
+
+            login(token='$HUGGINGFACE_HUB_TOKEN')
+            api = HfApi()
+
+            space_name = '{{inputs.parameters.hf-space-name}}'
+            org_name = '{{inputs.parameters.hf-organization}}'
+            space_id = f'{org_name}/{space_name}'
+
+            print(f'🔍 Monitoring training progress for space: {space_id}')
+            print(f'🔗 Space URL: https://huggingface.co/spaces/{space_id}')
+
+            # Monitor for training completion (simplified monitoring)
+            max_wait_time = 3600 * 4  # 4 hours max wait
+            check_interval = 60  # Check every minute
+            elapsed_time = 0
+
+            print(f'⏱️ Starting monitoring (max wait: {max_wait_time/3600:.1f} hours)')
+
+            while elapsed_time < max_wait_time:
+                try:
+                    # Check if space is running
+                    space_info = api.space_info(space_id)
+                    runtime_status = space_info.runtime.stage if space_info.runtime else 'unknown'
+                    
+                    print(f'[{elapsed_time//60:3d}m] Space status: {runtime_status}')
+                    
+                    if runtime_status == 'RUNNING':
+                        print('✅ Space is running and accessible')
+                        # In a real implementation, you might check training logs or status endpoints
+                        break
+                    elif runtime_status in ['BUILDING', 'STARTING']:
+                        print('🔄 Space is starting up...')
+                    elif runtime_status in ['STOPPED', 'FAILED']:
+                        print('❌ Space has stopped or failed')
+                        break
+                    
+                    time.sleep(check_interval)
+                    elapsed_time += check_interval
+                    
+                except Exception as e:
+                    print(f'⚠️ Error checking space status: {e}')
+                    time.sleep(check_interval)
+                    elapsed_time += check_interval
+
+            if elapsed_time >= max_wait_time:
+                print(f'⏰ Monitoring timeout reached ({max_wait_time/3600:.1f} hours)')
+
+            print('📊 Monitoring completed')
+            print(f'🔗 Check training results at: https://huggingface.co/spaces/{space_id}')
+            "
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "1"
+          limits:
+            memory: "2Gi"
+            cpu: "2"
+
+    # Template for downloading trained model and syncing to OneDrive
+    - name: download-and-sync-model
+      inputs:
+        parameters:
+          - name: hf-space-name
+          - name: hf-organization
+          - name: huggingface-token
+      container:
+        image: python:3.11-slim
+        command: [bash]
+        env:
+          - name: HUGGINGFACE_HUB_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: huggingface-credentials
+                key: HF_TOKEN
+        args:
+          - -c
+          - |
+            echo "Downloading trained model and syncing to OneDrive"
+
+            pip install --no-cache-dir huggingface_hub transformers torch
+            pip install --no-cache-dir 'dvc==3.61.0'
+
+            # Initialize DVC
+            dvc init --no-scm
+            dvc remote add -d onedrive /Users/amaslovs/Library/CloudStorage/OneDrive-SoftServe,Inc/MLOps-DVC-Storage
+
+            python -c "
+            from huggingface_hub import hf_hub_download, login, HfApi
+            import os
+            import shutil
+
+            login(token='$HUGGINGFACE_HUB_TOKEN')
+            api = HfApi()
+
+            org_name = '{{inputs.parameters.hf-organization}}'
+            model_name = 'qwen-devops-foundation'
+            model_id = f'{org_name}/{model_name}'
+
+            print(f'📥 Attempting to download model: {model_id}')
+
+            try:
+                # Check if model exists
+                model_info = api.model_info(model_id)
+                print(f'✅ Model found: {model_id}')
+                
+                # Download the model
+                os.makedirs('downloaded_model', exist_ok=True)
+                
+                # Download model files
+                files_to_download = ['config.json', 'pytorch_model.bin', 'tokenizer.json', 'tokenizer_config.json']
+                
+                for file in files_to_download:
+                    try:
+                        downloaded_file = hf_hub_download(
+                            repo_id=model_id,
+                            filename=file,
+                            local_dir='downloaded_model',
+                            local_dir_use_symlinks=False
+                        )
+                        print(f'✅ Downloaded: {file}')
+                    except Exception as e:
+                        print(f'⚠️ Could not download {file}: {e}')
+                
+                # Check if we have the essential files
+                if os.path.exists('downloaded_model/config.json'):
+                    print('✅ Model downloaded successfully')
+                    
+                    # Create archive for OneDrive
+                    shutil.make_archive('qwen-devops-foundation-hf', 'gztar', 'downloaded_model')
+                    print('✅ Model archived for OneDrive sync')
+                    
+                else:
+                    print('❌ Essential model files not found')
+                    
+            except Exception as e:
+                print(f'❌ Failed to download model: {e}')
+                print('💡 The model might still be training or not yet uploaded')
+                print(f'🔗 Check manually at: https://huggingface.co/{model_id}')
+            "
+
+            # Add to DVC and sync to OneDrive
+            if [ -f "qwen-devops-foundation-hf.tar.gz" ]; then
+                echo "📦 Adding model to DVC and syncing to OneDrive"
+                dvc add qwen-devops-foundation-hf.tar.gz
+                dvc push
+                
+                echo "✅ Model synced to OneDrive successfully"
+                echo "📁 Model available at: OneDrive-SoftServe,Inc/MLOps-DVC-Storage/"
+            else
+                echo "⚠️ No model file to sync"
+            fi
+
+            echo "🎉 Model download and sync process completed"
+        resources:
+          requests:
+            memory: "2Gi"
+            cpu: "1"
+          limits:
+            memory: "4Gi"
+            cpu: "2"

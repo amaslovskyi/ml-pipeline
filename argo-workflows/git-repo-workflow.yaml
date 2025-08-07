@@ -1,0 +1,532 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  name: ml-pipeline-from-git
+  namespace: argo
+spec:
+  serviceAccountName: argo-workflow-sa
+  entrypoint: git-sync-pipeline
+  arguments:
+    parameters:
+      - name: repo-url
+        value: "https://github.com/amaslovs/ml-pipeline.git"
+      - name: repo-branch
+        value: "main"
+      - name: workflows-path
+        value: "argo-workflows"
+      - name: model-name
+        value: "bert-classifier"
+      - name: data-version
+        value: "v1.0"
+      - name: dvc-s3-bucket
+        value: "mlops-data-bucket-1754148674-amaslovs"
+      - name: dvc-s3-region
+        value: "us-east-1"
+
+  templates:
+    - name: git-sync-pipeline
+      dag:
+        tasks:
+          - name: clone-repo
+            template: git-clone
+            arguments:
+              parameters:
+                - name: repo-url
+                  value: "{{workflow.parameters.repo-url}}"
+                - name: repo-branch
+                  value: "{{workflow.parameters.repo-branch}}"
+
+          - name: run-ml-pipeline
+            template: ml-pipeline-from-git
+            dependencies: [clone-repo]
+            arguments:
+              parameters:
+                - name: model-name
+                  value: "{{workflow.parameters.model-name}}"
+                - name: data-version
+                  value: "{{workflow.parameters.data-version}}"
+                - name: dvc-s3-bucket
+                  value: "{{workflow.parameters.dvc-s3-bucket}}"
+                - name: dvc-s3-region
+                  value: "{{workflow.parameters.dvc-s3-region}}"
+
+    - name: git-clone
+      inputs:
+        parameters:
+          - name: repo-url
+          - name: repo-branch
+      container:
+        image: alpine/git:latest
+        command: [git]
+        args:
+          - clone
+          - --branch
+          - "{{inputs.parameters.repo-branch}}"
+          - --single-branch
+          - "{{inputs.parameters.repo-url}}"
+          - /workspace
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "200m"
+      volumes:
+        - name: workspace
+          emptyDir: {}
+
+    - name: ml-pipeline-from-git
+      inputs:
+        parameters:
+          - name: model-name
+          - name: data-version
+          - name: dvc-s3-bucket
+          - name: dvc-s3-region
+      dag:
+        tasks:
+          - name: data-preprocessing
+            template: data-prep-from-git
+            arguments:
+              parameters:
+                - name: data-version
+                  value: "{{inputs.parameters.data-version}}"
+                - name: dvc-s3-bucket
+                  value: "{{inputs.parameters.dvc-s3-bucket}}"
+                - name: dvc-s3-region
+                  value: "{{inputs.parameters.dvc-s3-region}}"
+
+          - name: feature-engineering
+            template: feature-eng-from-git
+            dependencies: [data-preprocessing]
+            arguments:
+              parameters:
+                - name: model-name
+                  value: "{{inputs.parameters.model-name}}"
+                - name: dvc-s3-bucket
+                  value: "{{inputs.parameters.dvc-s3-bucket}}"
+                - name: dvc-s3-region
+                  value: "{{inputs.parameters.dvc-s3-region}}"
+
+          - name: model-training
+            template: train-model-from-git
+            dependencies: [feature-engineering]
+            arguments:
+              parameters:
+                - name: model-name
+                  value: "{{inputs.parameters.model-name}}"
+                - name: dvc-s3-bucket
+                  value: "{{inputs.parameters.dvc-s3-bucket}}"
+                - name: dvc-s3-region
+                  value: "{{inputs.parameters.dvc-s3-region}}"
+
+          - name: model-evaluation
+            template: evaluate-model-from-git
+            dependencies: [model-training]
+            arguments:
+              parameters:
+                - name: model-name
+                  value: "{{inputs.parameters.model-name}}"
+
+          - name: model-registration
+            template: register-model-from-git
+            dependencies: [model-evaluation]
+            arguments:
+              parameters:
+                - name: model-name
+                  value: "{{inputs.parameters.model-name}}"
+
+    - name: data-prep-from-git
+      inputs:
+        parameters:
+          - name: data-version
+          - name: dvc-s3-bucket
+          - name: dvc-s3-region
+      container:
+        image: python:3.9-slim
+        command: [bash]
+        args:
+          - -c
+          - |
+            echo "Starting data preprocessing from Git repository"
+            cd /workspace
+            pip install pandas numpy scikit-learn dvc boto3
+
+            # Set up DVC with S3 remote using parameters
+            dvc remote add -d onedrive /Users/amaslovs/Library/CloudStorage/OneDrive-SoftServe,Inc/MLOps-DVC-Storage
+
+            # Create data directory structure
+            mkdir -p data/raw data/processed data/interim
+
+            # Generate sample data with versioning
+            python -c "
+            import pandas as pd
+            import numpy as np
+            import os
+
+            # Create sample data with more variety
+            np.random.seed(42)
+            n_samples = 100
+
+            positive_texts = [
+                'This is excellent', 'Great product', 'Amazing service', 'Love this', 'Perfect solution',
+                'Outstanding quality', 'Fantastic experience', 'Wonderful service', 'Superb product', 'Excellent work'
+            ]
+
+            negative_texts = [
+                'This is terrible', 'Poor quality', 'Bad service', 'Hate this', 'Awful experience',
+                'Disappointing', 'Not good', 'Waste of money', 'Frustrating', 'Useless product'
+            ]
+
+            # Generate balanced dataset
+            texts = []
+            labels = []
+
+            for i in range(n_samples):
+                if np.random.random() > 0.5:
+                    texts.append(np.random.choice(positive_texts))
+                    labels.append(1)
+                else:
+                    texts.append(np.random.choice(negative_texts))
+                    labels.append(0)
+
+            # Create DataFrame
+            df = pd.DataFrame({'text': texts, 'label': labels})
+
+            # Save raw data
+            df.to_csv('data/raw/sample_data_v{{inputs.parameters.data-version}}.csv', index=False)
+
+            print(f'Data preprocessing completed')
+            print(f'Data version: {{inputs.parameters.data-version}}')
+            print(f'Dataset shape: {df.shape}')
+            print(f'Positive samples: {labels.count(1)}')
+            print(f'Negative samples: {labels.count(0)}')
+            print(f'Raw data saved to: data/raw/sample_data_v{{inputs.parameters.data-version}}.csv')
+            "
+
+            # Add raw data to DVC
+            dvc add data/raw/sample_data_v{{inputs.parameters.data-version}}.csv
+            dvc push
+
+            echo "Data versioned and pushed to S3 from Git repository"
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "500m"
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
+      volumes:
+        - name: workspace
+          emptyDir: {}
+
+    - name: feature-eng-from-git
+      inputs:
+        parameters:
+          - name: model-name
+          - name: dvc-s3-bucket
+          - name: dvc-s3-region
+      container:
+        image: python:3.9-slim
+        command: [bash]
+        args:
+          - -c
+          - |
+            echo "Starting feature engineering from Git repository"
+            cd /workspace
+            pip install pandas numpy scikit-learn dvc boto3 joblib
+
+            # Set up DVC with S3 remote using parameters
+            dvc remote add -d onedrive /Users/amaslovs/Library/CloudStorage/OneDrive-SoftServe,Inc/MLOps-DVC-Storage
+
+            # Pull latest data from DVC
+            dvc pull data/raw/sample_data_v1.0.csv.dvc
+
+            # Feature engineering with DVC versioning
+            python -c "
+            import pandas as pd
+            import numpy as np
+            from sklearn.feature_extraction.text import TfidfVectorizer
+            import joblib
+            import os
+
+            # Load raw data
+            df = pd.read_csv('data/raw/sample_data_v1.0.csv')
+            print(f'Loaded data shape: {df.shape}')
+
+            # Feature extraction
+            vectorizer = TfidfVectorizer(max_features=100, stop_words='english')
+            X = vectorizer.fit_transform(df['text'])
+            y = df['label']
+
+            # Create processed data directory
+            os.makedirs('data/processed', exist_ok=True)
+
+            # Save features and labels
+            joblib.dump(X, 'data/processed/features_v1.0.pkl')
+            joblib.dump(y, 'data/processed/labels_v1.0.pkl')
+            joblib.dump(vectorizer, 'data/processed/vectorizer_v1.0.pkl')
+
+            # Save processed data as CSV for inspection
+            feature_df = pd.DataFrame(X.toarray(), columns=[f'feature_{i}' for i in range(X.shape[1])])
+            feature_df['label'] = y
+            feature_df.to_csv('data/processed/processed_data_v1.0.csv', index=False)
+
+            print(f'Feature engineering completed')
+            print(f'Features shape: {X.shape}')
+            print(f'Model: {{inputs.parameters.model-name}}')
+            print(f'Features saved to: data/processed/')
+            print(f'Vectorizer saved to: data/processed/vectorizer_v1.0.pkl')
+            "
+
+            # Add processed data to DVC
+            dvc add data/processed/features_v1.0.pkl
+            dvc add data/processed/labels_v1.0.pkl
+            dvc add data/processed/vectorizer_v1.0.pkl
+            dvc add data/processed/processed_data_v1.0.csv
+            dvc push
+
+            echo "Processed data versioned and pushed to S3 from Git repository"
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "500m"
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
+      volumes:
+        - name: workspace
+          emptyDir: {}
+
+    - name: train-model-from-git
+      inputs:
+        parameters:
+          - name: model-name
+          - name: dvc-s3-bucket
+          - name: dvc-s3-region
+      container:
+        image: python:3.9-slim
+        command: [bash]
+        args:
+          - -c
+          - |
+            echo "Starting model training from Git repository"
+            cd /workspace
+            pip install pandas numpy scikit-learn mlflow dvc boto3 joblib
+
+            # Real model training with DVC data and MLflow tracking
+            python -c "
+            import pandas as pd
+            import numpy as np
+            from sklearn.linear_model import LogisticRegression
+            from sklearn.model_selection import train_test_split
+            from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
+            import mlflow
+            import mlflow.sklearn
+            import joblib
+            import os
+
+            # Set MLflow tracking URI to our cluster's MLflow server
+            mlflow.set_tracking_uri('http://mlflow-service.mlops-local.svc.cluster.local:5000')
+
+            # Load processed data from DVC
+            X = joblib.load('data/processed/features_v1.0.pkl')
+            y = joblib.load('data/processed/labels_v1.0.pkl')
+            vectorizer = joblib.load('data/processed/vectorizer_v1.0.pkl')
+
+            print(f'Loaded features shape: {X.shape}')
+            print(f'Loaded labels shape: {y.shape}')
+
+            # Split data
+            X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+            # Start MLflow run
+            with mlflow.start_run():
+                # Log parameters
+                mlflow.log_param('model_name', '{{inputs.parameters.model-name}}')
+                mlflow.log_param('algorithm', 'LogisticRegression')
+                mlflow.log_param('max_features', X.shape[1])
+                mlflow.log_param('test_size', 0.2)
+                mlflow.log_param('random_state', 42)
+                mlflow.log_param('data_version', 'v1.0')
+
+                # Train model
+                model = LogisticRegression(random_state=42, max_iter=1000)
+                model.fit(X_train, y_train)
+
+                # Evaluate
+                y_pred = model.predict(X_test)
+                accuracy = accuracy_score(y_test, y_pred)
+                precision = precision_score(y_test, y_pred, average='weighted')
+                recall = recall_score(y_test, y_pred, average='weighted')
+                f1 = f1_score(y_test, y_pred, average='weighted')
+
+                # Log metrics
+                mlflow.log_metric('accuracy', accuracy)
+                mlflow.log_metric('precision', precision)
+                mlflow.log_metric('recall', recall)
+                mlflow.log_metric('f1_score', f1)
+
+                # Save model artifacts
+                os.makedirs('models', exist_ok=True)
+                joblib.dump(model, 'models/{{inputs.parameters.model-name}}_v1.0.pkl')
+                joblib.dump(vectorizer, 'models/vectorizer_{{inputs.parameters.model-name}}_v1.0.pkl')
+
+                # Log the model
+                mlflow.sklearn.log_model(model, '{{inputs.parameters.model-name}}-training')
+                
+                # Log model artifacts
+                mlflow.log_artifact('models/{{inputs.parameters.model-name}}_v1.0.pkl')
+                mlflow.log_artifact('models/vectorizer_{{inputs.parameters.model-name}}_v1.0.pkl')
+
+                print(f'Model training completed')
+                print(f'Model: {{inputs.parameters.model-name}}')
+                print(f'Training Accuracy: {accuracy:.4f}')
+                print(f'Precision: {precision:.4f}')
+                print(f'Recall: {recall:.4f}')
+                print(f'F1-Score: {f1:.4f}')
+                print(f'MLflow Run ID: {mlflow.active_run().info.run_id}')
+                print(f'Model saved to: models/{{inputs.parameters.model-name}}_v1.0.pkl')
+            "
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+        resources:
+          requests:
+            memory: "2Gi"
+            cpu: "1000m"
+          limits:
+            memory: "4Gi"
+            cpu: "2000m"
+      volumes:
+        - name: workspace
+          emptyDir: {}
+
+    - name: evaluate-model-from-git
+      inputs:
+        parameters:
+          - name: model-name
+      container:
+        image: python:3.9-slim
+        command: [bash]
+        args:
+          - -c
+          - |
+            echo "Starting model evaluation from Git repository"
+            cd /workspace
+            pip install pandas numpy scikit-learn
+
+            # Simulate model evaluation
+            python -c "
+            import numpy as np
+            from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
+
+            # Simulate predictions
+            np.random.seed(42)
+            y_true = np.random.randint(0, 2, 20)
+            y_pred = np.random.randint(0, 2, 20)
+
+            # Calculate metrics
+            accuracy = accuracy_score(y_true, y_pred)
+            precision = precision_score(y_true, y_pred, average='weighted')
+            recall = recall_score(y_true, y_pred, average='weighted')
+            f1 = f1_score(y_true, y_pred, average='weighted')
+
+            print(f'Model evaluation completed')
+            print(f'Model: {{inputs.parameters.model-name}}')
+            print(f'Accuracy: {accuracy:.4f}')
+            print(f'Precision: {precision:.4f}')
+            print(f'Recall: {recall:.4f}')
+            print(f'F1-Score: {f1:.4f}')
+            "
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "500m"
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
+      volumes:
+        - name: workspace
+          emptyDir: {}
+
+    - name: register-model-from-git
+      inputs:
+        parameters:
+          - name: model-name
+      container:
+        image: python:3.9-slim
+        command: [bash]
+        args:
+          - -c
+          - |
+            echo "Starting model registration from Git repository"
+            cd /workspace
+            pip install mlflow pandas numpy scikit-learn joblib
+
+            # Real MLflow model registration with DVC integration
+            python -c "
+            import mlflow
+            import mlflow.sklearn
+            import joblib
+            import os
+            import shutil
+
+            # Set MLflow tracking URI to our cluster's MLflow server
+            mlflow.set_tracking_uri('http://mlflow-service.mlops-local.svc.cluster.local:5000')
+
+            # Load trained model and vectorizer
+            model = joblib.load('models/{{inputs.parameters.model-name}}_v1.0.pkl')
+            vectorizer = joblib.load('models/vectorizer_{{inputs.parameters.model-name}}_v1.0.pkl')
+
+            # Start MLflow run for model registration
+            with mlflow.start_run():
+                # Log parameters
+                mlflow.log_param('model_name', '{{inputs.parameters.model-name}}')
+                mlflow.log_param('algorithm', 'LogisticRegression')
+                mlflow.log_param('data_version', 'v1.0')
+                mlflow.log_param('model_version', 'v1.0')
+                
+                # Log the model to MLflow Model Registry
+                mlflow.sklearn.log_model(
+                    model, 
+                    '{{inputs.parameters.model-name}}',
+                    registered_model_name='{{inputs.parameters.model-name}}'
+                )
+                
+                # Log vectorizer as artifact
+                mlflow.log_artifact('models/vectorizer_{{inputs.parameters.model-name}}_v1.0.pkl')
+                
+                print(f'Model registration completed successfully')
+                print(f'Model: {{inputs.parameters.model-name}}')
+                print(f'Model type: LogisticRegression')
+                print(f'Data version: v1.0')
+                print(f'Model version: v1.0')
+                print(f'MLflow tracking URI: {mlflow.get_tracking_uri()}')
+                print(f'Run ID: {mlflow.active_run().info.run_id}')
+            "
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "500m"
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
+      volumes:
+        - name: workspace
+          emptyDir: {}

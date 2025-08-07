@@ -1,0 +1,177 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: qwen-devops
+  labels:
+    name: qwen-devops
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: model-config
+  namespace: qwen-devops
+data:
+  MODEL_REPO: "AMaslovskyi/qwen-devops-foundation-lora"
+  BASE_MODEL: "Qwen/Qwen3-8B"
+  MAX_LENGTH: "512"
+  TEMPERATURE: "0.7"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: huggingface-token
+  namespace: qwen-devops
+type: Opaque
+data:
+  # SECURITY: Never commit real tokens to version control!
+  # To set your token: kubectl create secret generic huggingface-token \
+  #   --from-literal=HF_TOKEN="your_actual_token_here" -n qwen-devops
+  HF_TOKEN: "REPLACE_WITH_REAL_TOKEN_USING_KUBECTL" # This is NOT a real token
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: qwen-devops-model
+  namespace: qwen-devops
+  labels:
+    app: qwen-devops-model
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: qwen-devops-model
+  template:
+    metadata:
+      labels:
+        app: qwen-devops-model
+    spec:
+      containers:
+        - name: qwen-devops
+          image: ghcr.io/huggingface/text-generation-inference:latest
+          ports:
+            - containerPort: 80
+          env:
+            - name: MODEL_ID
+              valueFrom:
+                configMapKeyRef:
+                  name: model-config
+                  key: MODEL_REPO
+            - name: HF_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: huggingface-token
+                  key: HF_TOKEN
+            - name: MAX_CONCURRENT_REQUESTS
+              value: "128"
+            - name: MAX_BEST_OF
+              value: "1"
+            - name: MAX_STOP_SEQUENCES
+              value: "4"
+            - name: MAX_INPUT_LENGTH
+              value: "2048"
+            - name: MAX_TOTAL_TOKENS
+              value: "4096"
+            - name: WAITING_SERVED_RATIO
+              value: "1.2"
+            - name: TRUST_REMOTE_CODE
+              value: "true"
+          resources:
+            requests:
+              memory: "16Gi"
+              cpu: "4"
+              nvidia.com/gpu: "1"
+            limits:
+              memory: "32Gi"
+              cpu: "8"
+              nvidia.com/gpu: "1"
+          volumeMounts:
+            - name: model-cache
+              mountPath: /data
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 80
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 80
+            initialDelaySeconds: 60
+            periodSeconds: 30
+      volumes:
+        - name: model-cache
+          emptyDir:
+            sizeLimit: 50Gi
+      nodeSelector:
+        accelerator: nvidia-tesla-t4 # Adjust based on your GPU nodes
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: qwen-devops-service
+  namespace: qwen-devops
+  labels:
+    app: qwen-devops-model
+spec:
+  selector:
+    app: qwen-devops-model
+  ports:
+    - port: 80
+      targetPort: 80
+      protocol: TCP
+      name: http
+  type: ClusterIP
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: qwen-devops-ingress
+  namespace: qwen-devops
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-body-size: "32m"
+spec:
+  rules:
+    - host: qwen-devops.your-domain.com # Replace with your domain
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: qwen-devops-service
+                port:
+                  number: 80
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: qwen-devops-hpa
+  namespace: qwen-devops
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: qwen-devops-model
+  minReplicas: 1
+  maxReplicas: 3
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
