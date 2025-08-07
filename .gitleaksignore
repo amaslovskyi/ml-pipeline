@@ -4,8 +4,9 @@
 # This file tells Gitleaks to ignore specific false positives while maintaining
 # real security scanning. Each entry should be justified with a comment.
 
-# Kubernetes deployment placeholder - NOT a real token
-deb710d48b1748c1374573578825a72906941a31:scripts/deployment/k8s-deployment.yaml:generic-api-key:29
+# Kubernetes deployment placeholder - NOT a real token (historical commit)
+# This was base64 encoding of "your_hf_token_here" - clearly a placeholder, not real secret
+deb710d48b1748c1374573578825a72906941a31:scripts/k8s-deployment.yaml:generic-api-key:28
 
 # =============================================================================
 # Pattern-based exclusions for common false positives
