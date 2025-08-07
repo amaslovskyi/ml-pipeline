@@ -1,13 +1,13 @@
 ---
-title: Qwen DevOps Training Pipeline
-emoji: 🚀
-colorFrom: green
-colorTo: blue
+title: Qwen DevOps Training
+emoji: 🤖
+colorFrom: blue
+colorTo: purple
 sdk: gradio
 sdk_version: "4.44.0"
 app_file: app.py
 pinned: false
-hw: a100-large
+hw: l40s
 ---
 
 # 🤖 Qwen3-8B DevOps Foundation Model Training
