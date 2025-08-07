@@ -1,0 +1,73 @@
+# =============================================================================
+# Gitleaks Ignore File - MLOps Pipeline Security Configuration
+# =============================================================================
+# This file tells Gitleaks to ignore specific false positives while maintaining
+# real security scanning. Each entry should be justified with a comment.
+
+# Kubernetes deployment placeholder - NOT a real token
+deb710d48b1748c1374573578825a72906941a31:scripts/deployment/k8s-deployment.yaml:generic-api-key:29
+
+# =============================================================================
+# Pattern-based exclusions for common false positives
+# =============================================================================
+
+# Test data and examples (not real secrets)
+**/test/**:*
+**/tests/**:*
+**/examples/**:*
+**/*example*:*
+**/*test*:*
+**/*demo*:*
+
+# Documentation files with example configurations
+**/*.md:*
+**/*.rst:*
+**/*.txt:*
+
+# Placeholder patterns that are clearly not real secrets
+*REPLACE_WITH_*:*
+*YOUR_*_HERE:*
+*EXAMPLE_*:*
+*PLACEHOLDER_*:*
+*DUMMY_*:*
+*FAKE_*:*
+
+# =============================================================================
+# Known false positives in configuration templates
+# =============================================================================
+
+# Helm chart templates and values (template syntax, not secrets)
+**/templates/**:*
+**/values.yaml:*
+**/values-*.yaml:*
+
+# =============================================================================
+# Development and testing environments
+# =============================================================================
+
+# Local development configurations (should use environment variables)
+**/.env.example:*
+**/.env.template:*
+**/config.example.*:*
+**/config.template.*:*
+
+# =============================================================================
+# MLOps specific exclusions
+# =============================================================================
+
+# Model configuration files (contain model IDs, not secrets)
+**/model_config.json:*
+**/tokenizer_config.json:*
+
+# Jupyter notebooks with example API calls
+**/*.ipynb:*
+
+# =============================================================================
+# Important Security Notes:
+# =============================================================================
+# 1. NEVER add real secrets to this ignore file
+# 2. Each ignore rule should be specific, not overly broad
+# 3. Review this file regularly and remove outdated entries
+# 4. Use environment variables or secret management for real credentials
+# 5. When in doubt, investigate the detected secret manually
+# =============================================================================

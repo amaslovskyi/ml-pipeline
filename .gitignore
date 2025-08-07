@@ -502,6 +502,23 @@ local_secrets.env
 dev_secrets.yaml
 test_api_keys.json
 
+# Security scanning and compliance tools
+.gitleaks.toml
+gitleaks-report.json
+security-scan-results/
+vulnerability-reports/
+bandit-report.json
+safety-report.txt
+
+# Kubernetes secrets and sensitive configs (NEVER commit these)
+**/secrets/
+**/secret-*.yaml
+**/secret-*.yml
+kubeconfig
+kubeconfig.*
+!kubeconfig.example
+!**/secret-template.yaml
+
 # Model training outputs that might contain training data samples
 training_outputs/
 fine_tuning_logs/
@@ -521,3 +538,6 @@ local_setup_guide_*.md
 *.backup.json
 *_backup_*.yaml
 recovery_data.json
+
+.cursor
+.dvc/config

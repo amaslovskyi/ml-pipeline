@@ -23,9 +23,10 @@ metadata:
   namespace: qwen-devops
 type: Opaque
 data:
-  # Base64 encoded HuggingFace token
-  # echo -n 'your_hf_token_here' | base64
-  HF_TOKEN: eW91cl9oZl90b2tlbl9oZXJl # Replace with your actual token
+  # SECURITY: Never commit real tokens to version control!
+  # To set your token: kubectl create secret generic huggingface-token \
+  #   --from-literal=HF_TOKEN="your_actual_token_here" -n qwen-devops
+  HF_TOKEN: "REPLACE_WITH_REAL_TOKEN_USING_KUBECTL" # This is NOT a real token
 ---
 apiVersion: apps/v1
 kind: Deployment
