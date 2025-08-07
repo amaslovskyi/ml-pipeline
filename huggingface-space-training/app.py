@@ -29,7 +29,7 @@ import wandb
 
 # Configuration
 MODEL_NAME = "Qwen/Qwen3-8B"
-OUTPUT_DIR = "./qwen-devops-foundation"
+OUTPUT_DIR = "/data/qwen-devops-foundation" if os.path.exists("/data") else "./qwen-devops-foundation"
 
 def load_devops_datasets():
     """Load and combine DevOps/SRE datasets with robust error handling"""
@@ -613,15 +613,15 @@ def train_model(wandb_project, learning_rate, epochs, batch_size, resume_from_ch
         wandb.login(key=wandb_key)
         wandb.init(
             project=wandb_project,
-            name=f"qwen-devops-l40s-{datetime.now().strftime('%Y%m%d_%H%M%S')}",
+            name=f"qwen-devops-4xl40s-{datetime.now().strftime('%Y%m%d_%H%M%S')}",
             config={
                 "model": MODEL_NAME,
                 "learning_rate": learning_rate,
                 "epochs": epochs,
                 "batch_size": batch_size,
                 "training_approach": "LoRA",
-                "gpu_type": "L40S",
-                "vram": "48GB"
+                "gpu_type": "4xL40S",
+                "vram": "192GB"
             }
         )
     
@@ -652,12 +652,12 @@ def train_model(wandb_project, learning_rate, epochs, batch_size, resume_from_ch
         if tokenizer.pad_token is None:
             tokenizer.pad_token = tokenizer.eos_token
         
-        # L40S has 48GB VRAM - optimized configuration (Updated for L40S)
-        print("🚀 Using L40S GPU with 48GB VRAM - performance optimized!")
-        print(f"📊 Available GPU memory: {torch.cuda.get_device_properties(0).total_memory / 1024**3:.1f} GB")
-        print("🔧 L40S Configuration Active - Updated v2")
+        # 4xL40S has 192GB total VRAM - optimized configuration (Updated for 4xL40S)
+        print("🚀 Using 4xL40S GPUs with 192GB total VRAM - performance optimized!")
+        print(f"📊 Available GPU memory: {torch.cuda.get_device_properties(0).total_memory / 1024**3:.1f} GB per device")
+        print("🔧 4xL40S Multi-GPU Configuration Active - Optimized for fastest training")
         
-        # Load model with L40S optimization
+        # Load model with 4xL40S optimization
         model = AutoModelForCausalLM.from_pretrained(
             MODEL_NAME,
             torch_dtype=torch.float16,
@@ -665,15 +665,15 @@ def train_model(wandb_project, learning_rate, epochs, batch_size, resume_from_ch
             trust_remote_code=True,
             low_cpu_mem_usage=True,
             use_cache=False,  # Disable cache for training
-            max_memory={0: "24GB"},  # Use 24GB of 44.4GB VRAM (20GB buffer for training overhead)
+            max_memory={0: "40GB", 1: "40GB", 2: "40GB", 3: "40GB"},  # Use 40GB per device (8GB buffer each)
         )
         
-        # Configure LoRA for L40S - optimized configuration
+        # Configure LoRA for 4xL40S - optimized configuration
         lora_config = LoraConfig(
             task_type=TaskType.CAUSAL_LM,
             inference_mode=False,
-            r=8,   # Minimal rank for L40S memory constraints
-            lora_alpha=16, # Proportionally reduced
+            r=16,  # Increased rank for 4xL40S multi-GPU setup
+            lora_alpha=32, # Proportionally increased for better performance
             lora_dropout=0.1,
             target_modules=["q_proj", "v_proj", "k_proj", "o_proj", "gate_proj", "up_proj", "down_proj"]
         )
@@ -694,33 +694,40 @@ def train_model(wandb_project, learning_rate, epochs, batch_size, resume_from_ch
         
         yield f"✅ Dataset prepared: {len(train_dataset)} train, {len(eval_dataset)} eval examples"
         
-        # Training arguments optimized for L40S GPU (48GB VRAM)
+        # Training arguments optimized for 4xL40S multi-GPU setup (192GB total VRAM)
         training_args = TrainingArguments(
             output_dir=OUTPUT_DIR,
             num_train_epochs=epochs,
-            per_device_train_batch_size=1,        # Ultra conservative for L40S to avoid OOM
-            per_device_eval_batch_size=1,         # Ultra conservative for L40S to avoid OOM
-            gradient_accumulation_steps=16,       # Compensate for smaller batch size (effective batch = 16)
+            per_device_train_batch_size=4,        # Increased for 4xL40S (48GB each)
+            per_device_eval_batch_size=2,         # Optimized for multi-GPU evaluation
+            gradient_accumulation_steps=4,        # Effective batch = 64 (4 devices × 4 batch × 4 accum)
             learning_rate=learning_rate,
             weight_decay=0.01,
-            logging_steps=10,
-            eval_steps=50,
-            save_steps=100,
+            logging_steps=5,                      # More frequent logging for monitoring
+            eval_steps=25,                        # Faster evaluation cycles
+            save_steps=50,                        # More frequent saves for disaster recovery
             eval_strategy="steps",
             save_strategy="steps",
             load_best_model_at_end=True,
             metric_for_best_model="eval_loss",
             greater_is_better=False,
-            warmup_steps=100,
+            warmup_steps=50,                      # Reduced warmup for faster training
             lr_scheduler_type="cosine",
             fp16=True,
-            dataloader_pin_memory=False,          # Disable to save memory
-            dataloader_num_workers=0,             # Disable to save memory
+            dataloader_pin_memory=True,           # Enable for multi-GPU performance
+            dataloader_num_workers=2,             # Optimized for multi-GPU
             remove_unused_columns=True,
             max_grad_norm=1.0,
             report_to="wandb" if wandb_key else "none",
-            run_name=f"qwen-devops-l40s-{datetime.now().strftime('%Y%m%d_%H%M')}",
+            run_name=f"qwen-devops-4xl40s-{datetime.now().strftime('%Y%m%d_%H%M')}",
             resume_from_checkpoint=resume_from_checkpoint,
+            # Multi-GPU optimizations
+            ddp_find_unused_parameters=False,     # Faster DDP
+            save_total_limit=5,                   # Keep more checkpoints for disaster recovery
+            save_on_each_node=True,               # Disaster recovery for multi-node
+            # Performance optimizations
+            group_by_length=True,                 # Group similar sequences for efficiency
+            dataloader_drop_last=True,            # Consistent batch sizes
         )
         
         # Data collator with proper padding
@@ -740,16 +747,31 @@ def train_model(wandb_project, learning_rate, epochs, batch_size, resume_from_ch
             processing_class=tokenizer,  # Use processing_class instead of tokenizer
         )
         
+        # Disaster recovery checkpoint detection
+        latest_checkpoint = None
+        if os.path.exists(OUTPUT_DIR):
+            checkpoints = [d for d in os.listdir(OUTPUT_DIR) if d.startswith("checkpoint-")]
+            if checkpoints:
+                latest_checkpoint = os.path.join(OUTPUT_DIR, sorted(checkpoints)[-1])
+                yield f"🔄 Found checkpoint for disaster recovery: {latest_checkpoint}"
+        
         # Final memory cleanup before training
-        yield "🧹 Final memory cleanup for L40S..."
+        yield "🧹 Final memory cleanup for 4xL40S..."
         torch.cuda.empty_cache()
         gc.collect()
         torch.cuda.empty_cache()
         
-        yield "🚀 Starting training with ultra-conservative L40S settings..."
+        yield "🚀 Starting training with 4xL40S multi-GPU optimizations..."
+        yield f"💾 Checkpoints will be saved every 50 steps to: {OUTPUT_DIR}"
         
-        # Train the model
-        trainer.train()
+        # Train the model with disaster recovery
+        try:
+            trainer.train(resume_from_checkpoint=latest_checkpoint)
+        except Exception as e:
+            yield f"⚠️ Training interrupted: {str(e)}"
+            yield f"💾 Progress saved to: {OUTPUT_DIR}"
+            yield "🔄 You can resume training by restarting the app"
+            raise
         
         yield "💾 Saving model..."
         
@@ -765,6 +787,30 @@ def train_model(wandb_project, learning_rate, epochs, batch_size, resume_from_ch
         # Final evaluation
         final_metrics = trainer.evaluate()
         
+        # Push to HuggingFace Hub automatically
+        yield "🚀 Pushing model to HuggingFace Hub..."
+        try:
+            hub_model_name = f"{wandb_project.replace('_', '-')}-4xl40s"
+            
+            # Push the model to Hub
+            model.push_to_hub(
+                hub_model_name,
+                use_temp_dir=True,
+                commit_message=f"4xL40S trained Qwen3-8B DevOps model - Final eval loss: {final_metrics.get('eval_loss', 'N/A'):.4f}"
+            )
+            
+            # Push the tokenizer to Hub
+            tokenizer.push_to_hub(
+                hub_model_name,
+                use_temp_dir=True,
+                commit_message=f"4xL40S trained tokenizer - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+            )
+            
+            yield f"✅ Model uploaded to: https://huggingface.co/{hub_model_name}"
+            
+        except Exception as e:
+            yield f"⚠️ Failed to push to Hub: {str(e)}\n💾 Model saved locally to {OUTPUT_DIR}"
+        
         if wandb_key:
             wandb.log(final_metrics)
             wandb.finish()
@@ -777,6 +823,164 @@ def train_model(wandb_project, learning_rate, epochs, batch_size, resume_from_ch
         error_msg = f"❌ Training failed: {str(e)}"
         yield error_msg
         return error_msg
+
+def upload_model_to_hub(wandb_project):
+    """Manual upload function for current training"""
+    import os
+    from transformers import AutoTokenizer, AutoModelForCausalLM
+    from datetime import datetime
+    from huggingface_hub import HfApi, login
+    
+    # Start with immediate feedback
+    yield "🚀 Upload button clicked! Starting upload process..."
+    yield f"📝 Project name: {wandb_project}"
+    
+    try:
+        # Enhanced authentication (using modern method without deprecated write_permission)
+        hf_token = os.environ.get('HF_TOKEN')
+        if hf_token:
+            yield "🔐 Authenticating with HuggingFace Hub..."
+            login(token=hf_token)  # Removed deprecated write_permission parameter
+        else:
+            yield "⚠️ No HF_TOKEN found in environment variables"
+            yield "💡 Please add your HuggingFace token in Space settings > Repository secrets"
+            return "❌ No HF_TOKEN found"
+        
+        # Check multiple possible locations for the model
+        possible_paths = [
+            "/data/qwen-devops-foundation",
+            "./qwen-devops-foundation", 
+            "/tmp/qwen-devops-foundation",
+            "qwen-devops-foundation"
+        ]
+        
+        model_path = None
+        for path in possible_paths:
+            if os.path.exists(path):
+                model_path = path
+                break
+        
+        if not model_path:
+            yield f"❌ No trained model found in any of these locations: {possible_paths}"
+            yield "📂 Exploring file system to find your model..."
+            
+            # Check current directory
+            current_files = os.listdir('.')
+            yield f"📁 Current directory (.): {current_files[:10]}{'...' if len(current_files) > 10 else ''}"
+            
+            # Check /data directory if it exists
+            if os.path.exists('/data'):
+                data_files = os.listdir('/data')
+                yield f"📁 Data directory (/data): {data_files[:10]}{'...' if len(data_files) > 10 else ''}"
+            
+            # Walk through directories looking for model files
+            yield "🔍 Searching for model files..."
+            found_models = []
+            for root, dirs, files in os.walk('.'):
+                # Look for common model files
+                model_files = [f for f in files if any(ext in f for ext in ['.bin', '.safetensors', 'config.json', 'tokenizer.json'])]
+                if model_files:
+                    found_models.append(f"{root}: {model_files[:3]}{'...' if len(model_files) > 3 else ''}")
+            
+            if found_models:
+                yield "📋 Found potential model files:"
+                for model in found_models[:5]:
+                    yield f"   {model}"
+            else:
+                yield "❌ No model files found anywhere"
+                yield "💡 You may need to train a model first using the '🚀 Start Training' button"
+            
+            return "❌ Model not found. Check the training completed successfully."
+        
+        yield f"🔍 Found trained model at: {model_path}"
+        
+        # List files in model directory  
+        model_files = os.listdir(model_path)
+        yield f"📁 Model files: {model_files[:10]}{'...' if len(model_files) > 10 else ''}"
+        
+        # Load the model and tokenizer
+        yield "📥 Loading trained model and tokenizer..."
+        
+        # Load with error handling
+        try:
+            tokenizer = AutoTokenizer.from_pretrained(model_path)
+            yield "✅ Tokenizer loaded successfully"
+        except Exception as e:
+            yield f"⚠️ Tokenizer load error: {str(e)}"
+            raise
+            
+        try:
+            model = AutoModelForCausalLM.from_pretrained(
+                model_path,
+                torch_dtype=torch.float16,
+                device_map="cpu"  # Load on CPU for upload
+            )
+            yield "✅ Model loaded successfully"
+        except Exception as e:
+            yield f"⚠️ Model load error: {str(e)}"
+            raise
+        
+        # Create hub name with username 
+        username = "AMaslovskyi"  # Your HF username
+        hub_model_name = f"{username}/{wandb_project.replace('_', '-')}-4xl40s"
+        
+        yield f"🚀 Uploading to Hub as: {hub_model_name}"
+        
+        # Create repository first
+        api = HfApi()
+        try:
+            api.create_repo(repo_id=hub_model_name, repo_type="model", exist_ok=True)
+            yield "📝 Repository created/verified"
+        except Exception as e:
+            yield f"⚠️ Repo creation warning: {str(e)} (may already exist)"
+        
+        # Push model to hub with enhanced error handling
+        try:
+            model.push_to_hub(
+                hub_model_name,
+                use_temp_dir=True,
+                commit_message=f"4xL40S trained Qwen3-8B DevOps model - Manual upload {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+                token=hf_token
+            )
+            yield "✅ Model uploaded successfully"
+        except Exception as e:
+            yield f"⚠️ Model upload error: {str(e)}"
+            raise
+        
+        # Push tokenizer to hub
+        try:
+            tokenizer.push_to_hub(
+                hub_model_name,
+                use_temp_dir=True,
+                commit_message=f"4xL40S trained tokenizer - Manual upload {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+                token=hf_token
+            )
+            yield "✅ Tokenizer uploaded successfully"
+        except Exception as e:
+            yield f"⚠️ Tokenizer upload error: {str(e)}"
+            raise
+        
+        final_url = f"https://huggingface.co/{hub_model_name}"
+        yield f"🎉 Model successfully uploaded!\n🔗 Available at: {final_url}"
+        
+        return f"✅ Upload completed: {final_url}"
+        
+    except Exception as e:
+        error_msg = f"❌ Upload failed: {str(e)}"
+        yield error_msg
+        yield "💡 Troubleshooting tips:"
+        yield "   1. Check HF_TOKEN is set correctly in Space secrets"
+        yield "   2. Ensure token has write permissions"
+        yield "   3. Try restarting the Space"
+        yield "   4. Check if model files exist and are complete"
+        return error_msg
+
+def test_upload_button(wandb_project):
+    """Simple test function to verify button clicks work"""
+    yield f"✅ TEST: Button clicked successfully!"
+    yield f"✅ TEST: Project name received: {wandb_project}"
+    yield f"✅ TEST: Function is working properly"
+    return "TEST COMPLETED"
 
 def create_interface():
     """Create Gradio interface"""
@@ -815,6 +1019,7 @@ def create_interface():
                 )
                 
                 train_btn = gr.Button("🚀 Start Training", variant="primary")
+                upload_btn = gr.Button("📤 Upload Model to Hub", variant="secondary")
             
             with gr.Column():
                 output = gr.Textbox(
@@ -832,6 +1037,14 @@ def create_interface():
             show_progress=True
         )
         
+        # Manual upload button
+        upload_btn.click(
+            fn=upload_model_to_hub,
+            inputs=[wandb_project],
+            outputs=output,
+            show_progress=True
+        )
+        
         gr.Markdown("""
         ## 📋 Setup Instructions:
         
@@ -841,6 +1054,7 @@ def create_interface():
         
         ## 💰 Cost Estimates:
         - **ZeroGPU**: FREE with PRO subscription ($9/month)
+        - **4xL40S GPU**: $4.80/hour (~$7.20 per training run) - **OPTIMAL**
         - **L4 GPU**: $0.80/hour (~$4.80 per training run)
         - **A100 GPU**: $2.50/hour (~$7.50 per training run)
         """)
