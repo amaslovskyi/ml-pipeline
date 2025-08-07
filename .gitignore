@@ -417,3 +417,107 @@ multirun/
 *.pt
 *.pth 
 /models
+
+# =============================================================================
+# MLOps Evaluation & Model Serving - SECURITY
+# =============================================================================
+
+# Evaluation results - may contain sensitive model outputs
+eval/results/
+**/results/
+*_evaluation_*.json
+*_performance_*.json
+*_comparison_*.json
+devops_model_evaluation_*.json
+model_comparison_*.json
+devops_model_performance_report_*.json
+
+# Ollama model files and temporary files
+Modelfile
+Modelfile-*
+*.modelfile
+ollama-models/
+.ollama/
+
+# Server logs and runtime files
+server.log
+inference.log
+uvicorn.log
+*.pid
+model_server.log
+
+# Model downloads and local model cache
+~/Downloads/qwen-devops-model/
+qwen-devops-model/
+model-cache/
+.transformers_cache/
+.cache/huggingface/
+
+# Generated test scripts and temporary files
+test_laptop_performance.py
+temp_model_test.py
+*.tmp.py
+
+# API keys and service credentials (CRITICAL)
+huggingface_token.txt
+hf_token.txt
+*.api_key
+*.access_token
+api_credentials.json
+model_api_keys.json
+
+# Local inference server configs
+server_config.json
+local_server.env
+inference_config.yaml
+
+# Performance benchmarks that may leak system info
+benchmark_results.json
+system_info.json
+hardware_analysis.json
+
+# Generated Ollama models (can be recreated)
+qwen-devops
+qwen-devops-*
+
+# =============================================================================
+# Additional Security Patterns - REPO SAFETY
+# =============================================================================
+
+# AWS credentials and configurations (CRITICAL)
+aws_credentials.txt
+.aws/credentials
+.aws/config
+aws-credentials-*
+s3_access_keys.json
+
+# Kubernetes contexts and configs that may contain cluster info
+kubeconfig-*
+k8s-context-*
+cluster-config.yaml
+kubectl-config
+
+# Local development secrets
+local_secrets.env
+dev_secrets.yaml
+test_api_keys.json
+
+# Model training outputs that might contain training data samples
+training_outputs/
+fine_tuning_logs/
+training_samples.json
+
+# System-specific paths and user info
+/Users/*/Downloads/
+/home/*/Downloads/
+**/local-user-data/
+
+# Generated documentation with potential system info
+system_analysis_*.md
+hardware_report_*.txt
+local_setup_guide_*.md
+
+# Backup files that might contain sensitive data
+*.backup.json
+*_backup_*.yaml
+recovery_data.json
