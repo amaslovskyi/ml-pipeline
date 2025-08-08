@@ -1,0 +1,230 @@
+{
+  "shining-valiant3": {
+    "responses": [
+      {
+        "question": "How would you implement a blue-green deployment strategy in Kubernetes?",
+        "category": "Kubernetes Deployment",
+        "response": "",
+        "evaluation": {
+          "total_score": 0
+        },
+        "response_time": 0.2502439022064209,
+        "error": "API error 404: Not Found"
+      },
+      {
+        "question": "What are the best practices for organizing Terraform modules in a multi-environment setup?",
+        "category": "Infrastructure as Code",
+        "response": "",
+        "evaluation": {
+          "total_score": 0
+        },
+        "response_time": 0.20018601417541504,
+        "error": "API error 404: Not Found"
+      },
+      {
+        "question": "How would you set up automated testing and deployment for a microservices architecture?",
+        "category": "CI/CD Pipeline",
+        "response": "",
+        "evaluation": {
+          "total_score": 0
+        },
+        "response_time": 0.19223880767822266,
+        "error": "API error 404: Not Found"
+      },
+      {
+        "question": "What metrics would you monitor for a production Kubernetes cluster?",
+        "category": "Monitoring & Observability",
+        "response": "",
+        "evaluation": {
+          "total_score": 0
+        },
+        "response_time": 0.19719314575195312,
+        "error": "API error 404: Not Found"
+      },
+      {
+        "question": "How would you implement security scanning in your DevOps pipeline?",
+        "category": "Security & Compliance",
+        "response": "",
+        "evaluation": {
+          "total_score": 0
+        },
+        "response_time": 0.19936370849609375,
+        "error": "API error 404: Not Found"
+      }
+    ],
+    "scores": [
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "response_times": [
+      0.2502439022064209,
+      0.20018601417541504,
+      0.19223880767822266,
+      0.19719314575195312,
+      0.19936370849609375
+    ],
+    "errors": [
+      "API error 404: Not Found",
+      "API error 404: Not Found",
+      "API error 404: Not Found",
+      "API error 404: Not Found",
+      "API error 404: Not Found"
+    ],
+    "model_name": "ShiningValiant3 (ML-Ops Specialized)"
+  },
+  "gpt-oss-base": {
+    "responses": [
+      {
+        "question": "How would you implement a blue-green deployment strategy in Kubernetes?",
+        "category": "Kubernetes Deployment",
+        "response": "",
+        "evaluation": {
+          "total_score": 0
+        },
+        "response_time": 0.21021103858947754,
+        "error": "API error 400: {\"error\":\"Bad Request: The endpoint is paused, ask a maintainer to restart it\"}"
+      },
+      {
+        "question": "What are the best practices for organizing Terraform modules in a multi-environment setup?",
+        "category": "Infrastructure as Code",
+        "response": "",
+        "evaluation": {
+          "total_score": 0
+        },
+        "response_time": 0.1979200839996338,
+        "error": "API error 400: {\"error\":\"Bad Request: The endpoint is paused, ask a maintainer to restart it\"}"
+      },
+      {
+        "question": "How would you set up automated testing and deployment for a microservices architecture?",
+        "category": "CI/CD Pipeline",
+        "response": "",
+        "evaluation": {
+          "total_score": 0
+        },
+        "response_time": 0.20952177047729492,
+        "error": "API error 400: {\"error\":\"Bad Request: The endpoint is paused, ask a maintainer to restart it\"}"
+      },
+      {
+        "question": "What metrics would you monitor for a production Kubernetes cluster?",
+        "category": "Monitoring & Observability",
+        "response": "",
+        "evaluation": {
+          "total_score": 0
+        },
+        "response_time": 0.21087098121643066,
+        "error": "API error 400: {\"error\":\"Bad Request: The endpoint is paused, ask a maintainer to restart it\"}"
+      },
+      {
+        "question": "How would you implement security scanning in your DevOps pipeline?",
+        "category": "Security & Compliance",
+        "response": "",
+        "evaluation": {
+          "total_score": 0
+        },
+        "response_time": 0.2006361484527588,
+        "error": "API error 400: {\"error\":\"Bad Request: The endpoint is paused, ask a maintainer to restart it\"}"
+      }
+    ],
+    "scores": [
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "response_times": [
+      0.21021103858947754,
+      0.1979200839996338,
+      0.20952177047729492,
+      0.21087098121643066,
+      0.2006361484527588
+    ],
+    "errors": [
+      "API error 400: {\"error\":\"Bad Request: The endpoint is paused, ask a maintainer to restart it\"}",
+      "API error 400: {\"error\":\"Bad Request: The endpoint is paused, ask a maintainer to restart it\"}",
+      "API error 400: {\"error\":\"Bad Request: The endpoint is paused, ask a maintainer to restart it\"}",
+      "API error 400: {\"error\":\"Bad Request: The endpoint is paused, ask a maintainer to restart it\"}",
+      "API error 400: {\"error\":\"Bad Request: The endpoint is paused, ask a maintainer to restart it\"}"
+    ],
+    "model_name": "GPT-OSS 20B (Base Model)"
+  },
+  "qwen-devops": {
+    "responses": [
+      {
+        "question": "How would you implement a blue-green deployment strategy in Kubernetes?",
+        "category": "Kubernetes Deployment",
+        "response": "",
+        "evaluation": {
+          "total_score": 0
+        },
+        "response_time": 0.19397568702697754,
+        "error": "API error 404: Not Found"
+      },
+      {
+        "question": "What are the best practices for organizing Terraform modules in a multi-environment setup?",
+        "category": "Infrastructure as Code",
+        "response": "",
+        "evaluation": {
+          "total_score": 0
+        },
+        "response_time": 0.19653987884521484,
+        "error": "API error 404: Not Found"
+      },
+      {
+        "question": "How would you set up automated testing and deployment for a microservices architecture?",
+        "category": "CI/CD Pipeline",
+        "response": "",
+        "evaluation": {
+          "total_score": 0
+        },
+        "response_time": 0.19923019409179688,
+        "error": "API error 404: Not Found"
+      },
+      {
+        "question": "What metrics would you monitor for a production Kubernetes cluster?",
+        "category": "Monitoring & Observability",
+        "response": "",
+        "evaluation": {
+          "total_score": 0
+        },
+        "response_time": 0.19355511665344238,
+        "error": "API error 404: Not Found"
+      },
+      {
+        "question": "How would you implement security scanning in your DevOps pipeline?",
+        "category": "Security & Compliance",
+        "response": "",
+        "evaluation": {
+          "total_score": 0
+        },
+        "response_time": 0.19819188117980957,
+        "error": "API error 404: Not Found"
+      }
+    ],
+    "scores": [
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "response_times": [
+      0.19397568702697754,
+      0.19653987884521484,
+      0.19923019409179688,
+      0.19355511665344238,
+      0.19819188117980957
+    ],
+    "errors": [
+      "API error 404: Not Found",
+      "API error 404: Not Found",
+      "API error 404: Not Found",
+      "API error 404: Not Found",
+      "API error 404: Not Found"
+    ],
+    "model_name": "Qwen-DevOps (Our Fine-tuned)"
+  }
+}

@@ -1,0 +1,230 @@
+{
+  "codefuse-devops": {
+    "responses": [
+      {
+        "question": "How would you implement a blue-green deployment strategy in Kubernetes?",
+        "category": "Kubernetes Deployment",
+        "response": "",
+        "evaluation": {
+          "total_score": 0
+        },
+        "response_time": 0.19723105430603027,
+        "error": "API error 404: Not Found"
+      },
+      {
+        "question": "What are the best practices for organizing Terraform modules in a multi-environment setup?",
+        "category": "Infrastructure as Code",
+        "response": "",
+        "evaluation": {
+          "total_score": 0
+        },
+        "response_time": 0.1921091079711914,
+        "error": "API error 404: Not Found"
+      },
+      {
+        "question": "How would you set up automated testing and deployment for a microservices architecture?",
+        "category": "CI/CD Pipeline",
+        "response": "",
+        "evaluation": {
+          "total_score": 0
+        },
+        "response_time": 0.1952369213104248,
+        "error": "API error 404: Not Found"
+      },
+      {
+        "question": "What metrics would you monitor for a production Kubernetes cluster?",
+        "category": "Monitoring & Observability",
+        "response": "",
+        "evaluation": {
+          "total_score": 0
+        },
+        "response_time": 0.1954967975616455,
+        "error": "API error 404: Not Found"
+      },
+      {
+        "question": "How would you implement security scanning in your DevOps pipeline?",
+        "category": "Security & Compliance",
+        "response": "",
+        "evaluation": {
+          "total_score": 0
+        },
+        "response_time": 0.27028894424438477,
+        "error": "API error 404: Not Found"
+      }
+    ],
+    "scores": [
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "response_times": [
+      0.19723105430603027,
+      0.1921091079711914,
+      0.1952369213104248,
+      0.1954967975616455,
+      0.27028894424438477
+    ],
+    "errors": [
+      "API error 404: Not Found",
+      "API error 404: Not Found",
+      "API error 404: Not Found",
+      "API error 404: Not Found",
+      "API error 404: Not Found"
+    ],
+    "model_name": "CodeFuse DevOps 7B (Specialized)"
+  },
+  "qwen-2.5-7b": {
+    "responses": [
+      {
+        "question": "How would you implement a blue-green deployment strategy in Kubernetes?",
+        "category": "Kubernetes Deployment",
+        "response": "",
+        "evaluation": {
+          "total_score": 0
+        },
+        "response_time": 0.1969599723815918,
+        "error": "API error 404: Not Found"
+      },
+      {
+        "question": "What are the best practices for organizing Terraform modules in a multi-environment setup?",
+        "category": "Infrastructure as Code",
+        "response": "",
+        "evaluation": {
+          "total_score": 0
+        },
+        "response_time": 0.188568115234375,
+        "error": "API error 404: Not Found"
+      },
+      {
+        "question": "How would you set up automated testing and deployment for a microservices architecture?",
+        "category": "CI/CD Pipeline",
+        "response": "",
+        "evaluation": {
+          "total_score": 0
+        },
+        "response_time": 0.19393301010131836,
+        "error": "API error 404: Not Found"
+      },
+      {
+        "question": "What metrics would you monitor for a production Kubernetes cluster?",
+        "category": "Monitoring & Observability",
+        "response": "",
+        "evaluation": {
+          "total_score": 0
+        },
+        "response_time": 0.18590784072875977,
+        "error": "API error 404: Not Found"
+      },
+      {
+        "question": "How would you implement security scanning in your DevOps pipeline?",
+        "category": "Security & Compliance",
+        "response": "",
+        "evaluation": {
+          "total_score": 0
+        },
+        "response_time": 0.19113612174987793,
+        "error": "API error 404: Not Found"
+      }
+    ],
+    "scores": [
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "response_times": [
+      0.1969599723815918,
+      0.188568115234375,
+      0.19393301010131836,
+      0.18590784072875977,
+      0.19113612174987793
+    ],
+    "errors": [
+      "API error 404: Not Found",
+      "API error 404: Not Found",
+      "API error 404: Not Found",
+      "API error 404: Not Found",
+      "API error 404: Not Found"
+    ],
+    "model_name": "Qwen 2.5 7B Instruct (General)"
+  },
+  "gpt2-baseline": {
+    "responses": [
+      {
+        "question": "How would you implement a blue-green deployment strategy in Kubernetes?",
+        "category": "Kubernetes Deployment",
+        "response": "",
+        "evaluation": {
+          "total_score": 0
+        },
+        "response_time": 0.1945018768310547,
+        "error": "API error 404: Not Found"
+      },
+      {
+        "question": "What are the best practices for organizing Terraform modules in a multi-environment setup?",
+        "category": "Infrastructure as Code",
+        "response": "",
+        "evaluation": {
+          "total_score": 0
+        },
+        "response_time": 0.195526123046875,
+        "error": "API error 404: Not Found"
+      },
+      {
+        "question": "How would you set up automated testing and deployment for a microservices architecture?",
+        "category": "CI/CD Pipeline",
+        "response": "",
+        "evaluation": {
+          "total_score": 0
+        },
+        "response_time": 0.1851959228515625,
+        "error": "API error 404: Not Found"
+      },
+      {
+        "question": "What metrics would you monitor for a production Kubernetes cluster?",
+        "category": "Monitoring & Observability",
+        "response": "",
+        "evaluation": {
+          "total_score": 0
+        },
+        "response_time": 0.1947178840637207,
+        "error": "API error 404: Not Found"
+      },
+      {
+        "question": "How would you implement security scanning in your DevOps pipeline?",
+        "category": "Security & Compliance",
+        "response": "",
+        "evaluation": {
+          "total_score": 0
+        },
+        "response_time": 0.19239592552185059,
+        "error": "API error 404: Not Found"
+      }
+    ],
+    "scores": [
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "response_times": [
+      0.1945018768310547,
+      0.195526123046875,
+      0.1851959228515625,
+      0.1947178840637207,
+      0.19239592552185059
+    ],
+    "errors": [
+      "API error 404: Not Found",
+      "API error 404: Not Found",
+      "API error 404: Not Found",
+      "API error 404: Not Found",
+      "API error 404: Not Found"
+    ],
+    "model_name": "GPT-2 (Baseline)"
+  }
+}
