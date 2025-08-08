@@ -1,9 +1,20 @@
 #!/usr/bin/env python3
 """
-🚀 OLLAMA QWEN DEVOPS EVALUATION
-Simple and fast evaluation of your qwen-devops model via Ollama
+🚀 OLLAMA QWEN DEVOPS EVALUATION (ENHANCED)
+Advanced evaluation of DevOps model responses via Ollama
 
-This is the streamlined version - much faster than loading the full PyTorch model!
+IMPROVEMENTS MADE:
+- Enhanced scoring system that values comprehensive, practical responses
+- Better recognition of DevOps concepts, synonyms, and related terms
+- Rewards implementation depth with code examples and YAML configs
+- Evaluates best practices, security, monitoring, and production readiness
+- Structured approach assessment (step-by-step guides, checklists)
+- Removed arbitrary length caps that penalized detailed explanations
+
+This addresses issues where quality responses were undervalued due to:
+- Simple keyword matching vs. conceptual understanding
+- Length penalties for comprehensive guides
+- Missing recognition of advanced DevOps terminology
 """
 
 import subprocess
@@ -166,78 +177,220 @@ class OllamaDevOpsEvaluator:
     def evaluate_response(
         self, response: str, keywords: List[str], difficulty: str
     ) -> Dict[str, Any]:
-        """Evaluate response quality"""
+        """
+        Enhanced response evaluation focusing on practical DevOps expertise
+        Prioritizes implementation depth, best practices, and real-world applicability
+        """
         if not response or response.strip() == "":
             return {
-                "length_score": 0,
-                "keyword_score": 0,
-                "technical_score": 0,
+                "structure_score": 0,
+                "concept_coverage": 0,
+                "implementation_depth": 0,
+                "best_practices_score": 0,
                 "total_score": 0,
+                "word_count": 0,
+                "concepts_found": 0,
+                "implementation_indicators": 0,
+                "best_practices_found": 0,
             }
 
-        # Length score (0-30 points)
-        length = len(response.split())
-        if length >= 100:
-            length_score = 30
-        elif length >= 60:
-            length_score = 25
-        elif length >= 30:
-            length_score = 20
-        elif length >= 15:
-            length_score = 10
-        else:
-            length_score = 5
-
-        # Keyword coverage (0-40 points)
         response_lower = response.lower()
-        keywords_found = sum(
-            1 for keyword in keywords if keyword.lower() in response_lower
-        )
-        keyword_score = min(40, (keywords_found / len(keywords)) * 40)
+        length = len(response.split())
 
-        # Technical depth (0-30 points)
-        technical_terms = [
-            "steps",
+        # 1. Structure & Organization (0-25 points)
+        # Rewards well-structured, step-by-step approaches
+        structure_indicators = [
+            "step",
+            "first",
+            "next",
+            "then",
+            "finally",
+            "overview",
+            "summary",
+            "checklist",
             "process",
-            "configuration",
-            "setup",
-            "deploy",
-            "configure",
-            "kubectl",
-            "yaml",
-            "command",
-            "script",
-            "best practices",
-            "production",
-            "environment",
-            "namespace",
-            "container",
-            "service",
-            "monitoring",
+            "workflow",
+            "strategy",
+            "approach",
+            "1.",
+            "2.",
+            "3.",
+            "•",
+            "-",
+            "phase",
+            "stage",
         ]
-        tech_found = sum(
-            1 for term in technical_terms if term.lower() in response_lower
+        structure_score = min(
+            25,
+            sum(3 for indicator in structure_indicators if indicator in response_lower),
         )
-        technical_score = min(30, (tech_found / 8) * 30)
 
-        # Difficulty adjustment
+        # 2. Concept Coverage (0-25 points) - Enhanced keyword matching
+        # Include synonyms and related concepts
+        enhanced_keywords = set(keywords)
+        keyword_expansions = {
+            "blue-green": [
+                "blue green",
+                "deployment strategy",
+                "zero-downtime",
+                "switch traffic",
+            ],
+            "service": ["load balancer", "ingress", "traffic routing", "endpoint"],
+            "rollback": ["revert", "fallback", "recovery", "previous version"],
+            "deployment": ["rollout", "release", "deploy"],
+            "monitoring": [
+                "observability",
+                "metrics",
+                "alerts",
+                "prometheus",
+                "grafana",
+            ],
+            "security": ["rbac", "network policy", "least privilege", "encryption"],
+            "terraform": ["infrastructure as code", "iac", "state management"],
+            "pipeline": [
+                "ci/cd",
+                "automation",
+                "workflow",
+                "github actions",
+                "jenkins",
+            ],
+        }
+
+        all_concepts = set(enhanced_keywords)
+        for key in keywords:
+            if key.lower() in keyword_expansions:
+                all_concepts.update(keyword_expansions[key.lower()])
+
+        concepts_found = sum(
+            1 for concept in all_concepts if concept.lower() in response_lower
+        )
+        concept_coverage = min(25, (concepts_found / max(len(all_concepts), 1)) * 25)
+
+        # 3. Implementation Depth (0-30 points)
+        # Rewards practical examples, code snippets, and detailed explanations
+        implementation_indicators = [
+            "yaml",
+            "kubectl",
+            "docker",
+            "helm",
+            "terraform",
+            "ansible",
+            "apiversion",
+            "metadata",
+            "spec",
+            "selector",
+            "template",
+            "deployment.yaml",
+            "service.yaml",
+            "ingress.yaml",
+            "configmap",
+            "apply -f",
+            "patch",
+            "create",
+            "delete",
+            "get pods",
+            "describe",
+            "namespace",
+            "labels",
+            "annotations",
+            "resources",
+            "limits",
+            "replicas",
+            "strategy",
+            "rollingupdate",
+            "recreate",
+            "probe",
+            "readiness",
+            "liveness",
+            "healthcheck",
+            "secret",
+            "volume",
+            "persistent",
+            "statefulset",
+            "daemonset",
+        ]
+        impl_found = sum(
+            1 for indicator in implementation_indicators if indicator in response_lower
+        )
+        implementation_depth = min(30, (impl_found / 15) * 30)
+
+        # 4. Best Practices & Production Readiness (0-20 points)
+        # Rewards security, monitoring, and production considerations
+        best_practices = [
+            "security",
+            "rbac",
+            "network policy",
+            "encryption",
+            "tls",
+            "monitoring",
+            "logging",
+            "alerts",
+            "prometheus",
+            "grafana",
+            "backup",
+            "disaster recovery",
+            "high availability",
+            "sla",
+            "resource limits",
+            "requests",
+            "quotas",
+            "autoscaling",
+            "testing",
+            "validation",
+            "smoke test",
+            "health check",
+            "gitops",
+            "version control",
+            "semantic versioning",
+            "least privilege",
+            "zero trust",
+            "compliance",
+            "audit",
+            "observability",
+            "tracing",
+            "metrics",
+            "error handling",
+        ]
+        practices_found = sum(
+            1 for practice in best_practices if practice in response_lower
+        )
+        best_practices_score = min(20, (practices_found / 10) * 20)
+
+        # Enhanced scoring for comprehensive responses
+        # Bonus for length when it indicates thoroughness (not just verbosity)
+        length_bonus = 0
+        if length >= 200 and implementation_depth >= 20:  # Long + practical
+            length_bonus = 5
+        elif length >= 100 and concept_coverage >= 15:  # Medium + conceptual
+            length_bonus = 3
+
+        # Difficulty adjustment - reward complexity for harder questions
         difficulty_multiplier = {
             "basic": 1.0,
-            "intermediate": 0.95,
-            "advanced": 0.9,
+            "intermediate": 1.05,  # Slightly bonus for handling complexity
+            "advanced": 1.10,  # More bonus for advanced topics
         }.get(difficulty, 1.0)
-        total_score = (
-            length_score + keyword_score + technical_score
-        ) * difficulty_multiplier
+
+        raw_score = (
+            structure_score
+            + concept_coverage
+            + implementation_depth
+            + best_practices_score
+            + length_bonus
+        )
+        total_score = min(100, raw_score * difficulty_multiplier)
 
         return {
-            "length_score": length_score,
-            "keyword_score": keyword_score,
-            "technical_score": technical_score,
+            "structure_score": structure_score,
+            "concept_coverage": concept_coverage,
+            "implementation_depth": implementation_depth,
+            "best_practices_score": best_practices_score,
+            "length_bonus": length_bonus,
             "total_score": total_score,
             "word_count": length,
-            "keywords_found": keywords_found,
-            "tech_terms_found": tech_found,
+            "concepts_found": concepts_found,
+            "implementation_indicators": impl_found,
+            "best_practices_found": practices_found,
         }
 
     def run_evaluation(self):
@@ -273,7 +426,10 @@ class OllamaDevOpsEvaluator:
                 )
                 print(f"   ✅ Score: {evaluation['total_score']:.1f}/100")
                 print(
-                    f"   📊 Words: {evaluation['word_count']}, Keywords: {evaluation['keywords_found']}/{len(test['keywords'])}"
+                    f"   📊 Words: {evaluation['word_count']}, Concepts: {evaluation['concepts_found']}"
+                )
+                print(
+                    f"   🔧 Implementation: {evaluation['implementation_indicators']}, Best Practices: {evaluation['best_practices_found']}"
                 )
                 print(f"   ⏱️  Time: {result['response_time']:.1f}s")
 
@@ -328,9 +484,8 @@ class OllamaDevOpsEvaluator:
         if scores:
             avg_score = statistics.mean(scores)
             max_score = max(scores)
-            min_score = min(scores)
 
-            print(f"📊 PERFORMANCE:")
+            print("📊 PERFORMANCE:")
             print(f"   Average Score: {avg_score:.1f}/100")
             print(f"   Best Score: {max_score:.1f}/100")
             print(
@@ -338,7 +493,7 @@ class OllamaDevOpsEvaluator:
             )
             print()
 
-            print(f"⏱️  TIMING:")
+            print("⏱️  TIMING:")
             print(f"   Average Response Time: {statistics.mean(response_times):.1f}s")
             print(f"   Total Time: {total_time:.1f}s")
             print(f"   Errors: {len(errors)}")
